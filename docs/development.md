@@ -144,8 +144,10 @@ shows the form.
 
    Check that `git rev-parse vX.Y.Z^{commit}` prints the candidate and that
    `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
-5. Create the GitHub release from the pushed tag, with that version's changelog section
-   as its notes:
+5. Create the GitHub release from the pushed tag. Its notes are that version's changelog
+   section when it fits GitHub's 125,000-character release-body limit; otherwise they are a
+   short summary linking to that section of `CHANGELOG.md` at the tag. Check the notes file's
+   length before running:
 
    ```bash
    gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z" --notes-file <notes.md>
