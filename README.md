@@ -26,16 +26,17 @@ terminal. The `app` extra includes both the CLI and MCP server; for development,
 use [the contributor setup](CONTRIBUTING.md).
 
 The package is not published to an index. A project that depends on it as a
-library pins a release tag, which names an immutable commit and carries the
-[API compatibility contract](docs/python-api.md):
+library pins a [release tag](https://github.com/randomparity/hmc-mcp/releases), which
+names the commit the release was verified at and carries the
+[API compatibility contract](docs/python-api.md). For the first release, `v0.1.0`:
 
 ```toml
 dependencies = ["hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"]
 ```
 
-Add `[app]` after the package name for the CLI and MCP server. `uv add
-"hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"` writes the same
-entry.
+Write `hmcpctl[app] @ ...` for the CLI and MCP server. With uv, `uv add --raw
+"hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"` writes that entry; without
+`--raw`, uv moves the Git source into `[tool.uv.sources]`, which other installers ignore.
 
 Existing pre-release installations must use the one-time
 [clean-cutover procedure](docs/configuration.md#clean-cutover-from-the-former-name).

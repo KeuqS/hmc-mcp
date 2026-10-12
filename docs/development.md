@@ -115,15 +115,22 @@ so the tag is what a consumer pins; the [README](../README.md#install) shows the
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
    Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
    heading (`tests/unit/test_changelog.py` requires the declared version to have one), and
-   update the README's pinned tag. Merge that change to `main`.
+   update the README's pinned tag. When `pyproject.toml` already declares `X.Y.Z` and the
+   changelog already has its heading but the version was never tagged, as `0.1.0` was, skip
+   the bump and reconcile that existing section with `[Unreleased]` instead of adding a second
+   heading. Merge that change to `main`.
 2. Choose the candidate: the `main` commit that change merged as. Its CI run must be green,
    and on a clean checkout of it `just verify` must pass.
-3. Run `just verification-report --fail-on-stale` on that checkout. It exits 1 when any
-   operation's live evidence is stale ([ADR 0127](adr/0127-derived-live-verification-staleness.md)).
-   Re-run the arms that evidence the stale operations at the candidate, following
-   [live testing](live-testing.md), and promote their observations before tagging; never
-   tag over a stale row. Nothing that changes an evidenced operation's import closure may
-   merge between this check and the tag.
+3. Run `just verification-report` on that checkout. It prints each operation's derived
+   live-verification state ([ADR 0127](adr/0127-derived-live-verification-staleness.md)), and
+   `--fail-on-stale` exits 1 when any operation in the catalog is stale. Every operation the
+   release claims as live-verified must read `current`: re-run the arms that evidence a stale
+   one at the candidate, following [live testing](live-testing.md), and promote their
+   observations. Whether stale operations outside that claim hold the tag is the release
+   owner's decision, recorded on the release issue. Promoting observations merges a new commit,
+   so that commit becomes the candidate: repeat step 2 on it and re-read the report, which
+   stays `current` because the catalog is not in any operation's import closure. Nothing that
+   changes a claimed operation's import closure may merge between this check and the tag.
 4. Tag that exact commit and push the tag:
 
    ```bash
