@@ -104,3 +104,38 @@ scripts/         # repository guardrails, generators, test runners, smoke checks
 - State changes are asynchronous **jobs**: POST a JobRequest to
   `/rest/api/uom/<Type>/<uuid>/do/<Operation>`, then poll
   `/rest/api/uom/Job/<job-uuid>`.
+
+## Releasing
+
+A release is a version in `pyproject.toml` and an annotated Git tag on the same commit
+([ADR 0033](adr/0033-static-package-version.md)). Nothing is published to a package index,
+so the tag is what a consumer pins; the [README](../README.md#install) shows the form.
+
+1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
+   must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
+   Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
+   heading (`tests/unit/test_changelog.py` requires the declared version to have one), and
+   update the README's pinned tag. Merge that change to `main`.
+2. Choose the candidate: the `main` commit that change merged as. Its CI run must be green,
+   and on a clean checkout of it `just verify` must pass.
+3. Run `just verification-report --fail-on-stale` on that checkout. It exits 1 when any
+   operation's live evidence is stale ([ADR 0127](adr/0127-derived-live-verification-staleness.md)).
+   Re-run the arms that evidence the stale operations at the candidate, following
+   [live testing](live-testing.md), and promote their observations before tagging; never
+   tag over a stale row. Nothing that changes an evidenced operation's import closure may
+   merge between this check and the tag.
+4. Tag that exact commit and push the tag:
+
+   ```bash
+   git tag -a vX.Y.Z -m "hmcpctl X.Y.Z" <candidate-sha>
+   git push origin vX.Y.Z
+   ```
+
+   Check that `git rev-parse vX.Y.Z^{commit}` prints the candidate and that
+   `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
+5. Create the GitHub release from the pushed tag, with that version's changelog section
+   as its notes:
+
+   ```bash
+   gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z" --notes-file <notes.md>
+   ```

@@ -25,6 +25,18 @@ If your shell cannot find `hmcpctl`, run `uv tool update-shell` and open a new
 terminal. The `app` extra includes both the CLI and MCP server; for development,
 use [the contributor setup](CONTRIBUTING.md).
 
+The package is not published to an index. A project that depends on it as a
+library pins a release tag, which names an immutable commit and carries the
+[API compatibility contract](docs/python-api.md):
+
+```toml
+dependencies = ["hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"]
+```
+
+Add `[app]` after the package name for the CLI and MCP server. `uv add
+"hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"` writes the same
+entry.
+
 Existing pre-release installations must use the one-time
 [clean-cutover procedure](docs/configuration.md#clean-cutover-from-the-former-name).
 
