@@ -26,6 +26,10 @@ back and then deleted.
 `cli-memopt-resgroup-calc` (`capture` prefix `2026-10-05-v11r2-p11-9824/`) is a read-only
 capture for #627 on the V11R2 HMC and POWER11 9824-42A system above.
 
+`cli-refcodes-unknown-lpar` (`capture` prefix `2026-10-12-q893/`) is a read-only capture for #893
+on an HMC at V10R3 SP1060 managing a POWER8 8247-22L: the reader's `lsrefcode` command against a
+synthetic partition name the HMC does not know.
+
 ## Format
 
 Every file is a JSON object with these keys:

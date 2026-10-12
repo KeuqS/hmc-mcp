@@ -1,0 +1,7 @@
+{
+  "capture": "2026-10-12-q893/probe.capture.jsonl#4",
+  "command": "lsrefcode -r lpar -m sys-R1 --filter lpar_names=hmcpctl-nonexistent-q893 -n 1 -F lpar_name,time_stamp,refcode --header",
+  "exit_status": 1,
+  "stdout": "HSCL8012 The partition named hmcpctl-nonexistent-q893 was not found.  Please check your entry and retry the command.\n",
+  "stderr": ""
+}
