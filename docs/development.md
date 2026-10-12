@@ -228,8 +228,9 @@ A release's changelog entry is minimal, and it is also the GitHub release body. 
   release does not claim. An entry without one is incomplete.
 
 The itemized history of what changed between releases is not carried into the entry; Git
-history keeps it. For 0.1.0 the itemized pre-release history is dropped from the changelog
-for that reason.
+history keeps it. Guidance an operator needs that only the changelog states moves into the
+user documentation before the itemized history is dropped. For 0.1.0 the itemized
+pre-release history is dropped from the changelog for that reason.
 
 ### Tag and release
 
@@ -247,14 +248,16 @@ release.
    tag. When `pyproject.toml` already
    declares `X.Y.Z` and the changelog already has its heading but the version was never
    tagged, as `0.1.0` was, skip the bump and rewrite that existing section as the minimal
-   entry instead of adding a second heading. Merge that change to `main`.
-2. Choose the tag commit: the `main` commit that change merged as. Its CI run must be green,
-   and on a clean checkout of it `just verify` must pass.
+   entry, dated for the release, instead of adding a second heading. Merge that change to `main`.
+2. Choose the tag commit: the `main` commit that change merged as, or a later `main` commit
+   the freeze admits. Its CI run must be green, and on a clean checkout of it `just verify`
+   must pass.
 3. Re-read `just verification-report` on that checkout and confirm every claimed operation
    still reads `current`. If one reads anything else, either a merge moved its closure or its
    observation passed 90 days; in both cases re-run its evidencing arms, as the
-   [freeze](#freeze) rule says, before tagging. Record this read on the release epic with
-   the tag commit. Its unclaimed stale operations must match the entry's Known issues list;
+   [freeze](#freeze) rule says, promote their observations, and repeat from step 2 on the
+   commit that carries them. Record the passing read on the release epic with the tag commit.
+   Its unclaimed stale operations must match the entry's Known issues list;
    if they do not, correct the entry, merge it, and repeat from step 2 on that commit.
 4. Tag that exact commit and push the tag:
 
@@ -266,9 +269,10 @@ release.
    Check that `git rev-parse vX.Y.Z^{commit}` prints the tag commit and that
    `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
 5. Create the GitHub release from the pushed tag. Its body is the version's changelog entry,
-   which a minimal entry keeps far below GitHub's 125,000-character release-body limit; check
-   the notes file's length anyway, because GitHub refuses a longer body. Its title carries the
-   tagged commit's short ID:
+   which a minimal entry keeps far below GitHub's 125,000-character release-body limit. Copy
+   the entry's body, without its `## [X.Y.Z]` heading, into the notes file and check that
+   `wc -m < <notes.md>` prints less than 125000, because GitHub refuses a longer body. The
+   title carries the tagged commit's short ID:
 
    ```bash
    short_sha=$(git rev-parse --short "vX.Y.Z^{commit}")
