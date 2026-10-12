@@ -32,8 +32,9 @@ verification ledger reads `current` for each at the release commit:
 - `job.get`, `job.wait`
 - `pcie.list_dedicated_slots`, `pcie.assign_dedicated_slot`, `pcie.unassign_dedicated_slot`
 
-The claim covers the MCP tools the run called and what it asserted. For example, power-off
-was verified for delayed and immediate shutdown only.
+The claim covers the MCP tools the run called and what it asserted. It does not cover the
+`hmcpctl` CLI commands that wrap the same operations, and power-off, for example, was verified
+for delayed and immediate shutdown only.
 [What 0.1.0 supports](https://github.com/randomparity/hmc-mcp/blob/v0.1.0/docs/compatibility.md#what-010-supports) maps each operation to its
 tool. `just verification-report` prints every operation's current state, and
 [`docs/capabilities/`](https://github.com/randomparity/hmc-mcp/blob/v0.1.0/docs/capabilities/README.md) holds the ledger, which is authoritative.
@@ -52,14 +53,14 @@ tool. `just verification-report` prints every operation's current state, and
 - `hmc_provision_lpar` with a dedicated PCIe slot fails live. The slot is written into the new
   partition's profile, but provisioning powers on the current configuration, so the running
   partition does not own the slot. How provisioning should activate is undecided (#1390).
-  Use the bare-CEC path instead.
 - Network boot is not supported by the LPAR power-on operation (#868).
 - `hmc_read_lpar_refcodes`' description says an unknown partition is believed to return an
-  empty list. It raises an error instead (#893).
+  empty list. It raises an error instead, as #893 established.
 - A name lookup without a managed-system selector uses the HMC-wide search, which may stall,
   or report a partition as not found, while a managed system is in `No Connection` (#1309).
-  Pass the system selector where a tool accepts one. Reads of a system in `Recovery` or
-  `No Connection` are otherwise uncaptured (#1290).
+  Passing the system selector avoids it for reads. `hmc_create_lpar`'s and
+  `hmc_provision_lpar`'s duplicate-name check and read-back search HMC-wide regardless. Reads
+  of a system in `Recovery` or `No Connection` are otherwise uncaptured (#1290).
 - A failed storage-mapping create can leave an unmapped VIOS server adapter that
   `storage list-mappings` does not show. Compare the VIOS's virtual SCSI server adapters with
   its mappings after such a failure (#1250).
