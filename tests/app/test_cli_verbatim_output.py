@@ -371,7 +371,7 @@ def _rg_result(mode):
         (
             cli_lpars,
             "",
-            ("run_cli_coroutine",),
+            ("with_client",),
             ["lpars", "set-msp", MARKED, "sys1", "true", "--yes"],
         ),
         (
