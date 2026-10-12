@@ -7,6 +7,7 @@ from dataclasses import asdict
 import typer
 from rich.text import Text
 
+from hmcpctl.operations.lpar.configuration import configure_lpar_msp
 from hmcpctl.operations.lpar.ownership import set_lpar_ownership_description
 
 from ...operations.affinity.ssh import (
@@ -32,7 +33,6 @@ from ...ssh.profiles import (
     get_lpar_msp,
     get_lpar_proc_compat,
     get_proc_compat_modes,
-    set_lpar_msp,
     set_lpar_proc_compat,
 )
 from ..output import VerbatimTable, console, print_json, usage_error
@@ -370,18 +370,29 @@ def lpars_get_msp(
 
 
 def lpars_set_msp(
-    lpar_name: str = typer.Argument(..., help="LPAR name"),
+    lpar_name: str = typer.Argument(..., help="VIOS partition name or UUID"),
     system_name: str = typer.Argument(..., help="Managed system name"),
     enabled: bool = typer.Argument(..., help="True to enable MSP, False to disable"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    ownership_override: bool = typer.Option(
+        False,
+        "--ownership-override",
+        help="Bypass ownership protection after operator approval",
+    ),
 ) -> None:
-    """Set the MSP (Migratable Service Partition) flag of an LPAR (HMC CLI via SSH)."""
+    """Set the MSP (Migratable Service Partition) flag of a VIOS (HMC CLI via SSH)."""
     if not yes and not typer.confirm(
         f"Set MSP={'1' if enabled else '0'} on '{lpar_name}' (system {system_name})?"
     ):
         raise typer.Abort()
-    result = run_cli_coroutine(
-        lambda: set_lpar_msp(ssh_config(), system_name, lpar_name, enabled)
+    result = with_client(
+        lambda hmc: configure_lpar_msp(
+            hmc,
+            system_name,
+            lpar_name,
+            enabled,
+            ownership_override=ownership_override,
+        )
     )
 
     console.print(f"MSP updated for '{lpar_name}'", style="green", markup=False)
