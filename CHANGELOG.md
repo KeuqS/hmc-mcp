@@ -8,192 +8,24 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
 
 ## [Unreleased]
 
-### Changed
+## [0.1.0] - 2026-10-12
 
-- `hmc_modify_user` without a replacement password sends the empty `UserProfilePassword`
-  element as GET serves it. V10R3 accepted the writes in the #1409 probe. Its users-arm
-  observation remains failed: an empty description resets to `HMC User`, which the arm
-  had expected to read as empty. The arm now checks that exact observed default;
-  consolidated live verification of the corrected harness remains pending (ADR 0202).
-- Bind `lpar.modify` delegated assignment rows and extend ST39 with an optional
-  scratch-only dedicated-slot proof, guarded restoration and explicit read failures.
-- The live harness gained an opt-in `lpar-power` arm (`scripts/live_lpar_power.py`, subtask
-  41). It creates `hmcpctl-live-pwr-<8 hex>` partitions and verifies `hmc_create_lpar`'s
-  refusals, `hmc_power_on_lpar` (profile and current-configuration activation, and a
-  running partition reported without a job), `hmc_power_off_lpar` (delayed and immediate),
-  `hmc_power_lpar`, `hmc_capture_lpar_console` and `hmc_delete_lpar` (refused while
-  activated), then `hmc_provision_lpar` on a run-owned 1 GiB VIOS volume and
-  `hmc_decommission_lpar`; preflight names it and `scripts/live_test_recovery.py` reports any
-  `hmcpctl-live-pwr-` partition, `lppwr` volume mapping or adapter serving one (#1346). The
-  bare-cec arm now records its create, PowerOn, console, PowerOff and delete steps as rows,
-  so each of those operations has one observing arm. The power and lifecycle operations'
-  capability rows now name the requests the code issues, and `lpar.power`,
-  `lpar.decommission`, `provision.lpar`, `system.power_on` and `system.power_off` carry
-  maturity records. `lpar.dump_restart`, provision's SR-IOV and vNIC arguments, a graceful
-  `hmc_power_lpar` stop and whole-system power stay unverified, each recorded with what it
-  needs. Live on V10R3 six of the arm's eight observations passed. `lpar.power_on`
-  failed because the HMC refuses the `OperationType` PowerOn parameter
-  (`INVALID_PARAMETER`; the request without it activates), and `provision.lpar` failed
-  because a dedicated slot it assigns lands in the profile while its PowerOn activates the
-  current configuration, so the running partition lacks the slot.
-- The live harness gained an opt-in `lpar-config` arm (`scripts/live_lpar_config.py`, subtask
-  39). It creates one `hmcpctl-live-lpar-<8 hex>` partition, verifies `hmc_modify_lpar`,
-  `hmc_rename_lpar`, `hmc_dlpar_mem`, `hmc_dlpar_proc`, `hmc_set_lpar_boot_order` and the
-  `hmc_clear_lpar_boot_order` refusal against it, activates it to SMS for the activated DLPAR
-  case, and deletes it; preflight names it and `scripts/live_test_recovery.py` reports any
-  `hmcpctl-live-lpar-` partition left behind (#1345). Live on V10R3 all six observations
-  passed. ST8 no longer declares an expected HTTP 406 for `hmc_modify_lpar`: the
-  read-modify-write path is accepted, so a 406 there is now a failure, not a gap. DLPAR on a
-  partition activated to SMS was refused (`HSCL7016`, the partition must be running), so DLPAR
-  on a running operating system stays unverified; the `hmc_modify_lpar` observation covers its
-  resource path, not its PCIe assignments. Memory above the maximum is refused with
-  `REST0264`.
-- `hmc_create_user` and `hmc_modify_user` take `associated_task_role` as a task-role name
-  (`TaskRoleName` from `hmc_list_task_roles`) and `associated_resource_roles` as resource-role
-  names, not hrefs. The `UserProfile` document now writes them as the documented
-  `AssociatedTaskRole` and `AssociatedResourceRole` text elements, in the documented element
-  order, with `AuthenticationType` in the lower case the HMC lists (a V10R3 create carrying
-  `Local` was refused with `REST0001`); an href passed as before is sent as a name (ADR 0202,
-  #632). The builder is in every
-  handler's import closure, so every previously current live observation now reads `stale`
-  (`closure-changed`, ADR 0127) until its arm re-runs.
-- The live harness's user lifecycle moved from round2 to its own opt-in `users` arm
-  (`scripts/live_users.py`, subtask 11). It creates one `hmcpctl-live-<8 hex>` viewer user with
-  remote access disabled and deletes it by UUID in the same run; preflight names it, and
-  `scripts/live_test_recovery.py` reports any `hmcpctl-live-` user left behind.
-  `LIVE_TEST_TEST_USER_NAME` is retired: a `.env` that still sets it loads with a notice, and the
-  line can be deleted (#632). Live on V10R3 the HMC refused `hmc_create_user` (REST0001: a `kb`
-  marking must be `COR`), so creation, and the get, modify and delete that follow it, remain
-  unverified; the user, role and remote-access reads are verified.
-- `HMCClient` no longer raises a logoff transport failure (`HMCTransportError`) when its
-  `async with` body completed: it logs a warning naming the HMC host and noting that the HMC
-  session may persist until the HMC times it out, so a completed tool call is no longer reported
-  as failed. An HMC rejection of the logoff (`HMCError`) still raises, and a body that raised
-  still carries every cleanup failure as a note (ADR 0028 amendment, #1325).
-- `hmc_power_off_lpar`, `hmcpctl lpars power-off`, `power_lpar`, `submit_power_off` and
-  `jobs.power_off_lpar_job` refuse `operation=shutdown` with `restart=true` and
-  `immediate=false` before any job is built. On the HMC that combination is a dump restart,
-  which crashes the partition, and it previously needed no `allow_dump_restart` grant. Pass
-  `immediate=true` (CLI: `--immediate`) for an immediate restart, use `operation=osshutdown`
-  for an operating-system restart, or use `hmc_dump_restart_lpar` for the dump. The tool's
-  docstring no longer calls `immediate=false` graceful: it is a delayed shutdown
-  (ADR 0164 amendment, #1314).
-- `hmc_upload_iso` and `hmcpctl storage upload-iso` return the download digest as
-  `source_sha256` instead of `sha256`, with no alias. It is computed from the bytes fetched from
-  the source URL, not read back from the VIOS; `media` is documented as the HMC repository entry,
-  whose `MountType` can differ from VIOS `lsrep` (#1281).
-- `hmc_list_lpars`, `hmc_list_vios` and `hmc_list_lpar_ownership` return `entries` and
-  `unreadable_systems` instead of a bare list, as do `hmcpctl lpars list --json` and
-  `hmcpctl vios list --json` and the `list_lpars`, `list_vios` and `list_lpar_ownership`
-  operations. Without a system they no longer read the HMC-wide partition or VIOS feeds,
-  which timed out on an HMC with one system in `No Connection`. They read each operating
-  managed system's own feed and name every other system in `unreadable_systems`; the CLI also
-  prints one `Skipped managed system` line per skipped system on stderr. A VIOS state filter is
-  now always applied locally (ADR 0197, #1293).
+First tagged release. It ships the `hmcpctl` CLI, the MCP server, and the Python library. Its
+stable Python API is the six-name `hmcpctl.api` facade (ADR 0118); every other module is a
+pre-release domain API. The release claims live verification for 15 operations, listed with
+how to check any other operation's state in
+[`docs/compatibility.md`](docs/compatibility.md#what-010-supports).
 
-### Removed
-
-- `hmc_install_vios_by_lpar_selector` (operation `lpar.install_os`) and the
-  `install_vios_by_lpar_selector` operation are retired (#1371, ADR 0203). The selector
-  resolved its target only through the `LogicalPartition` feed and then required a Virtual I/O
-  Server, which is listed only in the `VirtualIOServer` feed, so it could never submit an
-  install. Install a VIOS with `hmc_install_vios` (`install_vios`): it takes the same arguments,
-  with `vios_name_or_uuid` and `vios_ip` in place of `lpar_name_or_uuid` and `lpar_ip`. The
-  `lpar.install_os` capability and maturity rows are gone; `cli:commands/installios` stays bound
-  by `vios.install`. The server exposes 162 tools by default.
-- `hmcpctl.documents.build_media_repository_delete_document` and
-  `build_virtual_optical_media_delete_document` are removed. No request path called them:
-  `hmc_delete_media_repository` and `hmc_delete_optical_media` remove the node by VolumeGroup
-  read-modify-write (#1415).
-
-### Fixed
-
-- `hmc_set_lpar_msp` and `hmc lpars set-msp` can target a VIOS, the only partition type
-  `msp` is valid for (#1318). The target resolves by name or UUID through the selected
-  system's `VirtualIOServer` feed and crosses ADR 0092's ownership rule; a selector outside
-  that feed is refused before any SSH command. The CLI previously skipped the ownership
-  check entirely and now accepts `--ownership-override`. An access-policy grant for the
-  tool still names the VIOS under `lpar` targets, not `vios`.
-
-- `hmc_create_vios_vfc_group_label` and `hmc_update_vios_vfc_group_label` refuse a vFC group
-  label or rename `new_name` longer than 16 characters before any HMC call; the tool
-  descriptions and the help for `hmcpctl vios create-vfc-group-label` LABEL and
-  `update-vfc-group-label --new-name` now state the limit (#1380, #1412).
-- `hmc_power_on_lpar`, `hmcpctl lpars power-on --operation-type` and the operations below them
-  still accept `operation_type="activate"` but no longer send the `OperationType` PowerOn
-  parameter, which a V10R3 HMC refuses with "Parameter 'OperationType' is not allowed for this
-  Job." (`INVALID_PARAMETER`). `activate` is the job's default, so stating it now activates
-  exactly as omitting it does, and the lpar-power arm's current-configuration activation
-  reached Open Firmware on V10R3 (#1392).
-- `hmc_create_virtual_network` and `hmc_add_network_adapter` refuse a VLAN id outside 1-4094
-  with a `ValueError` before any HMC call; they previously sent any integer to the HMC (#629).
-- `hmc_create_virtual_network` sends `NetworkName` with `kb="CUR"`, as the HMC serves it. A V10R3
-  HMC refused the previous `kb="CUD"` with HTTP 400 `REST0001` before creating anything (#629).
-- `hmc_processed_metric_links`, `hmc_aggregated_metric_links`, `hmc_processed_metrics`,
-  `hmc_aggregated_metrics` and `hmcpctl metrics show` no longer fail with HTTP 406 on a V10R3
-  HMC. The metric feed request sent the generic UOM `Accept`, which the HMC refuses on PCM
-  feeds as it does on the preferences endpoint (#1202); it now sends `Accept: */*` and no
-  `X-HMC-Schema-Version`. The long-term-monitor feed shares that request (#634).
-- `hmc_processed_metrics`, `hmc_aggregated_metrics` and `hmcpctl metrics show --fetch` now
-  return the metrics document on a V10R3 HMC. The document request sent
-  `Accept: application/json`, which the HMC answers with HTTP 406; it now sends `*/*` and
-  receives `application/vnd.ibm.powervm.pcm.json`. The newest-document choice also skips the
-  partition sub-feed entries a managed system's feed lists, which carry a newer stamp than any
-  document and returned an Atom feed instead of JSON (#634).
-- `hmc_set_pcm_preferences` and `hmcpctl metrics set-prefs` no longer send a hand-built
-  document carrying only the changed flags, which a V10R3 HMC rejected with HTTP 500
-  "Unexpected error during unmarshalling" for every flag. They now read the preferences and post
-  the HMC's own `ManagedSystemPcmPreference` element back with only the requested flags changed,
-  as IBM's PCM REST walkthrough does (#634).
-
-- `hmc_sync_lpar_profile` no longer claims to save the running configuration over the current
-  profile. Its command sets the partition's persistent `sync_curr_profile` setting, which a
-  live capture confirmed. The tool and `synchronize_lpar_profile` now take
-  `mode="enable" | "disable" | "suspend"` (default `enable`, the previous command), so the
-  setting can be turned off again, and they refuse any other mode before any HMC call.
-  The live harness no longer leaves synchronization enabled on its test partition
-  (ADR 0201, #627).
-
-- `scripts/live_capture_export.py vocabulary` keeps a value it would record as `<text>` when a
-  schema enum for the element lists it exactly: the enum bound to the element, else any enum
-  named for it. A value longer than 41 characters, such as `ManagedSystem` `State`
-  `pending authentication - password updates required`, was lost. Name-bearing elements still
-  record their shape class. The 9080-HEX vocabulary is re-derived with it and now binds
-  `NetworkInterface` to `NetworkInterface.Enum`, which `just live-vocabulary` enforces (#1292).
-- The 9028-21B, 9043-MRX, 9242-21B, 9824-42A and 9009-42A vocabularies are re-derived under
-  that rule. `NetworkInterface` records `eth0` and `eth1` instead of `<text>` in the first four,
-  which bind it to `NetworkInterface.Enum`; `CurrentConnectionSpeed` gains the
-  `ConnectionSpeed.Enum` members it had as `<text>` in 9028-21B and 9009-42A. The
-  8247-22L vocabulary is unchanged by it; the V10R3 POWER9 one is not re-derived, because its
-  folded window input is no longer available (#1299).
-- `hmc_list_lpars` and `hmc_list_vios` with a system, and system-scoped LPAR and VIOS name
-  lookups, raise an error naming the system, its `State` and its `DetailedState` when the HMC
-  answers the system's partition or VIOS feed with no entries and the system is not
-  `operating` (for example `recovery` or `no connection`). They used to return `[]` or "not
-  found". An empty feed from an operating system still means none (#1289).
-- That check now lives in the client's system-scoped partition and VIOS feeds, so every
-  system-scoped read gets it, at one system read per empty feed. Fleet health reports a system
-  that is not operating with an LPAR inventory warning instead of failing;
-  `hmc_capacity_report` and `hmc_find_placement` leave it out, and fail when every system is
-  left out; `hmc_system_summary` warns, owner discovery counts it as unreadable, and the
-  utilization report records a gap instead of zero partitions (#1301).
-- A mutation that names both a managed system and an LPAR UUID, when the system's partition
-  feed cannot be read, now refuses with the feed error itself, which names the system and its
-  state when it is not operating, instead of advising a retry. Ownership listing for one system
-  and `hmc_decommission_lpar`, dry run included, refuse the same way rather than report no
-  partitions, a missing LPAR or an empty storage blast radius. A waited template deployment
-  still submits and skips the ownership stamp with its snapshot warning (#1302).
-- `mount-optical-media` / `hmc_mount_optical_media` refuses, with a 409 and before any write, a
-  `target_device` that an optical mapping on the VIOS already uses, naming its media and the
-  remedies. When the HMC itself answers 500 `name is already used in another mapping`, the error
-  keeps its side-effect report and adds the same remedies (#1283).
-- `hmcpctl report utilization --csv` quotes a `notes` cell that starts with a spreadsheet
-  formula character, as it already did the other text columns (#1269).
-- `validate_hmc_name` refuses a name starting with `-`, which would reach the HMC CLI in option
-  position; this covers the install, VIOS install and reference-code tools (#887).
+The entries below record the development that preceded the tag. Defect fixes made before the
+tag are not itemized, because no earlier release shipped the defects; each is in the commit
+history under its issue number, and the behavior it settled is described in the guides and the
+generated tool reference. An entry that reports live verification describes a run at an earlier
+commit; the verification ledger, not this changelog, says which observations still apply.
 
 ### Added
 
+- MCP server and CLI for the IBM HMC REST API, the supported `hmcpctl.api` facade, and the
+  ownership-stamp workflow operations.
 - Live verification of the PCM preference, metric and partition-template operations (#634).
   Round2's subtask 5 asserts what those reads return, and subtask 12 no longer toggles the
   managed system's long-term monitor flag. A new opt-in `pcm` arm, `scripts/live_pcm.py`
@@ -500,769 +332,295 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
   observations from the live runner, adding maturity evidence for seven operations
   and recording the firmware-500 gap for `console.info` on this hardware (#625).
 
-### Fixed
-- `hmc_install_vios_by_lpar_selector` now refuses a VIOS-type partition name with an error
-  pointing at `hmc_install_vios`, instead of reporting "No LPAR named …". The selector resolves
-  only `LogicalPartition`-feed partitions, and a VIOS is listed only under `VirtualIOServer`
-  (#1247).
-- The dedicated PCIe slot read behind `hmc_list_dedicated_pcie_slots` returns no slots for the
-  HMC's `No results were found.` reply instead of failing, and a malformed reply now raises
-  `HMCCLIError` naming the read and its expected fields instead of a bare `ValueError`. The
-  minimum-affinity policy, resource-group affinity score and profile `io_slots` reads report a
-  malformed reply in the same form, and the last two read the empty-result reply as no rows
-  (#1203).
-- A malformed `port` or `verify_ssl` in one profile now makes the profile listing (`config show`,
-  the MCP profile listing, `report utilization`) fail with a `ConfigError` naming the profile and
-  field instead of a bare `ValueError`, and a string `verify_ssl` such as `"false"` is listed as
-  `false` rather than `true` (#1257).
-- `HMCConfig` validation errors no longer repeat the rejected input value, so an unquoted
-  numeric `password` in `config.toml` is not echoed by any CLI or MCP path (#1256).
-- `hmcpctl` output no longer reads HMC-sourced text or command arguments as Rich markup or
-  emoji codes. Before this fix, Rich read a `[word]` segment as markup and dropped it, and
-  turned a `:word:` code into an emoji. This applied to confirmation lines, warnings, error messages,
-  `console info` and every listing table's title, headers and cells. A crafted argument
-  such as `x[bold red]y` could therefore restyle the confirmation that echoed it. Values
-  are no longer passed through `rich.markup.escape`, which doubled a trailing backslash.
-  `raw get` and `raw post` now print the body as received, ANSI codes and control
-  characters included; before, they also wrapped it at 80 columns when piped and expanded
-  tabs. An AST test fails when a `console`/`err_console` call that parses markup
-  interpolates a value without `markup=False` or `Text`, when code calls `from_markup` or
-  `render`, and when a module other than `output.py` imports from `rich` beyond
-  `rich.text` (#1029).
-- A mapping create that fails with a 5xx (`hmc_mount_optical_media`, `hmc_map_storage_to_lpar`,
-  `hmc_attach_disk_to_lpar`, the storage step of `hmc_provision_lpar`, and `storage
-  mount-optical-media`, `map` and `attach-disk`) now says in its "possible side effect" error
-  that it may have left a VIOS virtual SCSI server adapter
-  with no mapping, and names the read-only `lshwres -r virtualio --rsubtype scsi` listing that
-  shows it. `storage list-mappings` does not show such an adapter: in the #1085 window a mount
-  refused with 500 REST0269 left one behind. `mount-optical-media` help and the
-  `hmc_mount_optical_media` description now state REST0269's precondition (activate or apply
-  a profile once first), and the ISO-install recipe's Recovery step lists the adapters (#1237).
-- `hmc_create_vios` and `create_vios` now create the VIOS. They sent a `LogicalPartition`
-  document to the system's `LogicalPartition` collection, which V10R3 refuses with 500
-  `REST0140 Invalid Partition Type associated with LogicalPartition`, so no VIOS was ever
-  created. The create now PUTs a `VirtualIOServer` document to
-  `ManagedSystem/{uuid}/VirtualIOServer` and returns the created entry (#1214).
-- `scripts/live_capture_export.py tokenize` no longer leaks the rest of a lab-prefixed name:
-  collected names are tokenized before any `--private` pattern, a `--private` match takes
-  its whole word, and a private token left joined to a word fails the export (#1202).
-  `just live-vocabulary` also checks assignments and keyword arguments named for an
-  element (`PartitionState="…"`, `wait_job_status = "…"`).
-- `hmc_list_io_slots` with a `pci_class` other than `all` filters the slot listing in
-  hmcpctl instead of piping it through `grep` on the HMC, so a class with no slots returns
-  `[]`; `grep` exits 1 when nothing matches, which failed the whole call (#1202).
-- `hmc_list_sea_adapters` returns `[]` when the HMC prints its empty-result line,
-  `No results were found.`, instead of one row whose `lpar_name` is that sentence.
-  `hmc_list_fc_ports` returns `[]` for that line too, and reads the default `lshwres`
-  output as the `name=value` rows the HMC prints rather than as a CSV with a header row,
-  which it never has (#1202).
-- `hmc_list_sriov_adapters` and `pcie.list_sriov_adapters` report a dedicated-mode adapter's
-  `adapter_id` as `null` rather than the string `"null"` the HMC prints for it, and
-  `hmc_set_sriov_adapter_mode` refuses an `adapter_id` that is not a positive decimal before
-  any HMC command; given `"null"` it used to answer that the dedicated adapter was "already in
-  dedicated mode". Its docstring now names `hmc_list_sriov_adapters` as the source of
-  `adapter_id`; it named `hmc_list_io_slots`, whose DRC indexes never match (#1202).
-- The `hmc_list_resources` docstring no longer offers VirtualSwitch, VirtualNetwork,
-  SharedMemoryPool, SharedProcessorPool, HostEthernetAdapter, LogicalPartitionProfile or
-  SRIOVAdapter as listable: the tool reads `/rest/api/uom/{type}`, those types exist only
-  under a parent, and a V10R3 HMC answers a root `SRIOVAdapter` read with HTTP 400
-  `INVALID_URL` (#1202).
+- `docs/capabilities/maturity.json` carries its first live observation, from the
+  harness shake-down run against V10R3 / POWER10 hardware: `console.info`, result
+  `failed`, on an HMC firmware defect serializing a null `Session/SessionId` property.
+  The row derives as `stale (closure-changed)` rather than `failed` on current `main`,
+  because the operation's import closure moved after the observation was taken — the
+  staleness rule working as designed, not a recording error (#708).
 
-- `hmc_list_vios_backups` and `list_vios_backups` return `[]` for a VIOS with no backups.
-  V10R3 answers that `lsviosbk` read with exit 0 and `No results were found.`, which the
-  header check refused as "Malformed lsviosbk CSV" (#1202).
-- `hmc_delete_vios` and `delete_vios` read the VIOS state from
-  `VirtualIOServer/{uuid}/quick/PartitionState` and delete through `VirtualIOServer/{uuid}`,
-  and the `hmc_install_vios` preflight reads the VIOS entry there. V10R3 answers 404 for a
-  VIOS UUID under `LogicalPartition`, so every VIOS delete and install failed before reaching
-  its precondition check. Their refusal messages now point at `hmc_list_vios`, since
-  `hmc_get_lpar_state` cannot read a VIOS (#1202).
-- Storage-mapping reads and writes compare VIOS and LPAR UUIDs case-insensitively. V10R3
-  prints both upper case, so a lower-case `lpar` selector made `hmc_list_storage_mappings`
-  return `[]` and `hmc_detach_storage_mapping` refuse the mapping as not belonging to it, and a
-  lower-case VIOS UUID failed every map and detach with "identity does not match" (#1202).
-- `hmc_get_vios_storage_detail` now returns the VIOS's virtual Fibre Channel mappings, and the
-  decommission storage inventory now sees them. Both asked for the two mapping groups as
-  repeated `group` parameters, which V10R3 answers with the first group only; the request now
-  sends `?group=ViosSCSIMapping,ViosFCMapping` (#1202).
-- The PCM metric tools explain an HTTP 404 on a metric feed. The captured V11R2 HMC answers
-  both `ProcessedMetrics` and `AggregatedMetrics` with 404 while every collection
-  preference is disabled; the error now names the missing feed and points at
-  `hmc_get_pcm_preferences` (#1202).
-- `hmc_fleet_health` reports the rest of the estate when one system's VIOS feed is refused,
-  adding a warning that names the system, instead of failing whole on the V11R2 HTTP 500. A
-  refused partition feed still fails the result (#1202).
-- `hmc_system_summary` keeps its result when the HMC refuses one inventory read. A V11R2 HMC
-  answers a system's VIOS feed with HTTP 500 when a VIOS cannot report its storage, and the
-  summary failed as "unhandled errors in a TaskGroup"; the refused count is now `null` and a
-  new `warnings` field names the source and the HMC's message (#1202).
-- `console info` prints the console's `NetworkInterfaces`; it looked for a `NetworkInfo`
-  element V10R3 does not return (#1202).
-- The managed-system fallback that resolves a system through `ManagedSystem/quick/All`
-  matches its UUID in any case; V10R3 prints those UUIDs in lower case, so an upper-case
-  UUID was never found. `hmc_list_systems` now names the entry fields V10R3 returns,
-  `MachineTypeModelAndSerialNumber` and `PrimaryIPAddress`, instead of the quick-property
-  names `MTMS` and `IPAddress` (#1202).
-- `hmc_fleet_health` no longer reports a partition that is not activated for its inactive
-  RMC connection, which listed every powered-off partition as unhealthy (#1202).
-- `hmc_list_partition_templates` and `hmc_get_partition_template` send
-  `Accept: application/atom+xml`. V10R3 answers the typed
-  `templates+xml; type=PartitionTemplate` Accept with an empty HTTP 406, so both tools
-  always failed. `templates list` now prints each template's `partitionTemplateName`; it
-  read a `templateName` field the library feed does not carry (#1202).
-- `hmc_get_pcm_preferences` sends `Accept: */*`, which V10R3 serves; it sent the uom media
-  type, which V10R3 answers (like the documented `application/xml`) with an empty HTTP 406.
-  `hmc_set_pcm_preferences` posts the `ManagedSystemPcmPreference` root the HMC returns for a
-  managed system. A PCM or partition-template HTTP 406 is now reported as the media-type
-  refusal it is, not as "not licensed" (#1202).
-- `hmc_get_remote_access` and `hmc_configure_remote_access` read the console with the uom
-  `ManagementConsole` media type. V10R3 answers the documented `web+xml` Accept with an
-  HTML HTTP 406 page, so both tools always failed. The update now writes each field inside
-  its `LdapConfiguration` or `KerberosConfiguration` container, where the HMC keeps it,
-  instead of appending a duplicate top-level element; `RealmConfig`, `KerberosRealm`,
-  `Hostname` and `Realm`, which name the nested KDC list rather than a settable field, are
-  refused as unknown (#1202).
-- `hmc_list_users` with `authentication_type` set returns the matching users. V10R3 prints
-  the type in lower case (`local`) on a leaf carrying a `ksv` attribute, and the filter
-  compared it as a bare string against `Local`, `LDAP` or `Kerberos`, so every filtered
-  listing was empty (#1202).
-- `hmc_update_firmware` reads the HMC level from the nested `VersionInfo` element
-  (`Version`, `Release`, `ServicePackName`) that V10R3 returns. It expected a
-  `V11R1M1111` text leaf, so it refused every HMC as "version is unavailable" (#1202).
-- `hmc_snapshot_capture` reads the partition's running allocation from the nested
-  `PartitionMemoryConfiguration` and `PartitionProcessorConfiguration` containers V10R3
-  returns; it read flat leaves that do not exist and refused every partition with "requires
-  true/false HasDedicatedProcessors". The snapshot's HMC name and version now come from
-  `ManagementConsoleName` and the nested `VersionInfo` (`V10R3M1060`); both were always
-  empty (#1202).
-- `hmc_snapshot_capture` reads the profile record a V10R3 HMC prints. It refused every
-  partition with "native profile contains an invalid attribute name", because the HMC quotes
-  the list-valued `virtual_serial_adapters` pair (`"name=v1,v2"`) and splits a pair at its
-  first `=`; V11R2 also quotes a comma-bearing list element inside such a pair. A dedicated
-  profile, which has no `*_proc_units`, now projects its processor counts instead of failing
-  (#1202).
-- `hmc_list_lpars(state=...)` and `hmcpctl lpars list --state` without a system no longer
-  fail for a state with a space. They used `LogicalPartition/search/(PartitionState==...)`,
-  which every captured HMC (V10R3 and V11R2) answers with `500 Unable to parse expression`
-  for `not activated`; they now read the partition feed and filter it (#1202).
-- `hmc_provision_lpar` no longer reports an existing volume group as missing when its UUID
-  is given in upper case. A V10R3 HMC reads VolumeGroup ids in lower case, and the check
-  compared them case-sensitively (#1202).
-- Job polling no longer treats `EXCEPTION` or `FAILED` as terminal statuses, and no longer
-  reads a `ResponseException` element. Neither appears in the HMC's job-status reference
-  (`CANCELED_*`, `COMPLETED_OK`, `COMPLETED_WITH_*`, `FAILED_*`, `NOT_STARTED`, `RUNNING`) or
-  in any capture; a failed job's text comes from its `Results`. Bare `COMPLETED` stays a
-  success status because two console job pages document it. `hmc_wait_for_job`,
-  `hmcpctl jobs wait` and `hmc_migrate_lpar` now name the documented statuses (#1202).
-- A job read the HMC refuses with `400 REST000B`/`REST000E` now reports the HMC's own message
-  ("Unrecognized root REST type of jobs") with the response body attached. It used to replace
-  it with a guess that the endpoint needed a licence or PTF level (#1202).
-- The SSH LPAR UUID lookup with no system given skips a system whose partition listing fails,
-  such as one in No Connection state, and keeps searching. It used to abort on the first
-  failing system; when nothing matches, the error now names each system it could not search
-  (#1202).
-- `hmc_list_memory_pools` returns an empty list for a system without Active Memory Sharing.
-  On HMC V11R2 with POWER11 systems, `lshwres -r mempool` exits 1 with `HSCLA4A0`, so the
-  tool failed instead of reporting that the system has no pools; `hmc_remove_memory_pool`
-  now refuses there with "no pool with that name exists" (#1202).
-- `hmc_add_network_adapter`, `hmcpctl adapters add-network --mac` and
-  `build_client_network_adapter_document` now refuse a `mac_address` that is not 12
-  hexadecimal digits with no separators, the form chhwres documents and the HMC prints;
-  a colon-separated MAC was previously sent to the HMC unchanged (#1202).
-- The SSH fallback that resolves an LPAR UUID with no system given now lists the managed
-  systems and runs `lssyscfg -r lpar -m <system> -F uuid,name` for each one. It used to run
-  `lssyscfg -r lpar` without `-m`, which the HMC refuses with exit 1, so a UUID-only selector
-  failed whenever REST was unreachable (#1202).
-- The default `name=value` CLI reads (`lshwres`, `lsmemopt`) no longer turn the HMC's empty
-  answer into a row: `hmc_list_memory_pools` on a system with no pool returned the phantom pool
-  `{"No results were found.": ""}`, and `hmc_list_lpar_memopt_scores` failed with "missing
-  required fields" on an empty answer. A list-valued pair, which the HMC prints quoted
-  (`"curr_lpar_names=a,b"`), is now one attribute instead of a key with a leading quote, so
-  `hmc_remove_memory_pool`'s assigned-partition guard sees the partitions it lists (#1202).
-- `hmc_deploy_partition_template(wait=True)` and `deploy_partition_template` now stamp the
-  deployed partition's ownership when the job finishes `COMPLETED_OK`. They accepted only a
-  bare `COMPLETED`, a status the HMC does not report, so a real deployment was never stamped
-  (#1161).
-- The capture harness no longer discards every HMC error body. V10R3 echoes the request
-  headers in each `HttpErrorResponse`, so the harness now redacts only the echoed session and
-  cookie values and keeps the rest of the body; text that still names a secret is replaced
-  whole, as before (#1161).
-- A shared-processor create whose explicit processing units exceed that level's virtual
-  processors (a virtual processor uses at most 1.0 unit) is now refused before any request is
-  sent, naming each `<level>_procs`/`<level>_vcpus` pair and the CLI options to change. This
-  covers `hmc_create_lpar`, `hmc_provision_lpar` and `lpars create` (REST and the `mksyscfg`
-  fallback) and `hmc_create_vios` (REST). Omitted vcpus count as the `mksyscfg` defaults (min 1,
-  desired 1, max `max(desired, 2)`), so `desired_procs=1.5` with no `--vcpus` is refused;
-  dedicated requests and modify are unchanged. (#1034)
-- `hmcpctl storage attach-disk` and `hmc_attach_disk_to_lpar` refuse a disk name over the
-  15-character VIOS limit or a capacity that is not a positive multiple of 1024 MiB before
-  any HMC request, on a dry run as on a real run, with the builder's message (#1032).
-- Resolving a partition or managed-system UUID to its CLI name over SSH (used by
-  `lpars capture-console` and the other SSH-passthrough tools) matches the UUID
-  case-insensitively. V10R3's `lssyscfg -F uuid` prints LPAR UUIDs in upper case, so a
-  lower-case LPAR UUID failed with `Could not resolve LPAR UUID` (#879).
-- `pcie.list_dedicated_slots` (and so `hmc_list_dedicated_pcie_slots` and
-  `network list-dedicated-pcie-slots`) reports an unowned slot's `owner_lpar` as `null`. It
-  returned the string `"null"`, which `lshwres -F` prints for an absent partition name on
-  V10R3 (#1195).
-- `operations.jobs.get_job` and `wait_for_job` (and so `hmc_get_job`, `hmc_wait_for_job`,
-  `jobs show` and `jobs wait`) no longer report a job as missing when a supplied `job_href`
-  returns 404 and the confirming read through the global jobs path returns `HTTP 400 REST000E`.
-  They now raise `HMCError`. On V10R3 that 400 refuses the request's URL form and comes back
-  for a live job too; only `404 REST0005 No such Job` means missing. ADR 0093 carries a dated
-  amendment with the evidence review of #95 (#1174).
-- `hmc_set_lpar_description`, `lpars set-description` and `set_lpar_ownership_description` no
-  longer strip the ownership stamp. `chsyscfg` replaces the whole field, so plain text set on a
-  stamped partition left it unowned, and mutable and deletable without `ownership_override`.
-  Plain text now replaces the field but keeps the current `[hmcpctl owner:... created:...]`
-  stamp and its `[caller ...]` segment at its start, taken from the same description read the
-  ownership guard makes. Text carrying its own complete stamp is still written as given, the
-  ADR 0066 re-stamp and handover. A `[hmcpctl` or `[caller ` fragment without a complete stamp
-  is refused before any HMC call. Removing a stamp now takes `ownership_override`, which
-  writes the text as given. ADR 0066 carries a dated amendment recording the change (#1169).
-- `hmc_power_on_lpar` and `power_on_lpar` with `wait` now read the partition
-  state once after the job ends successfully and raise when it is `error` or `not activated`,
-  naming the state and pointing at `hmc_read_lpar_refcodes`. The HMC can finish the PowerOn job
-  `COMPLETED_OK` while activation fails, which was reported as success (#1165).
-- The managed-system MTMS is now read from the element V10R3 serves,
-  `MachineTypeModelAndSerialNumber`, through one shared renderer (`xmlutil.render_mtms`).
-  `systems list` showed `-` for every system, a VIOS backup addressed by system UUID always
-  failed its MTMS lookup, and snapshot capture and `console info`
-  read the unserved `MachineTypeModelSerialNumber`. The old name is no longer read (#1184).
-- `hmc_lpar_summary`, `lpars summary` and `lpar_summary` returned null memory and processor
-  figures on V10R3, which nests them in `PartitionMemoryConfiguration` and
-  `PartitionProcessorConfiguration`. They now read those containers: `current_proc_units` and
-  `desired_proc_units` are processing units for a shared partition and processors for a dedicated
-  one, `dedicated_procs` is now a boolean saying which, and `desired_vcpus` is null for a
-  dedicated partition. `current_*` no longer falls back to the desired value. `os_type` is a
-  string. An inactive partition still reads 0 for every figure on V10R3 (#1183).
-- `hmc_modify_lpar`, `hmc_dlpar_proc` and the other REST modify paths now write a dedicated
-  partition's `sharing_mode` in the HMC's own `SharingMode` spelling (`sre idle proces` for
-  `share_idle_procs`), reusing the create document's mapping. The CLI spelling was refused with
-  `REST0001` (#1185).
-- `hmc_create_lpar`, `lpars create` and provisioning now create partitions through the REST API on
-  V10R3 instead of always falling back to `mksyscfg`. The create document now carries
-  `schemaVersion` on the processor configurations, follows the element order and enumeration
-  spelling of the HMC's own XSDs (`SharingMode` `keep idle procs`, not `keep_idle_procs`),
-  states `HasDedicatedProcessors=false` for a shared partition, and nests
-  `max_virtual_slots` as `PartitionIOConfiguration/MaximumVirtualIOSlots`. A REST-created
-  partition gets `default_profile` and a current configuration and activates without an
-  apply, so the `apply_profile` step reports `skipped` with that reason and no warning
-  (#1164, ADR 0178 amendment).
-- Both create paths take omitted memory and processor values from one defaults function, so
-  the REST document carries the processing units and minimum virtual processors V10R3
-  requires. A dedicated create without `sharing_mode` gets `keep_idle_procs` on either path,
-  where `mksyscfg` previously refused it. The `mksyscfg` record now honors a capped shared
-  request instead of always sending `uncap`, and either path refuses a dedicated
-  `sharing_mode` on a shared request before any create call. The vCPU-versus-units guards
-  (#938, #949) now run before the REST create too, not only before `mksyscfg`. A create with
-  no memory or processor values still goes straight to `mksyscfg`'s `all_resources=1`
-  (#1164).
-- The `mksyscfg` fallback after a refused REST create now logs the HMC's message at
-  `WARNING`, so a defect in the create document no longer hides behind a successful CLI
-  create (#1164).
-- `hmc_create_lpar` and `create_and_stamp_lpar` refuse a `keylock` other than `normal` or
-  `manual` before any HMC call. `auto` was accepted before, but V10R3's `KeylockPosition`
-  enumeration has no such value and `mksyscfg` takes no keylock, so an `auto` create
-  fell back to `mksyscfg` and dropped the keylock silently (#1164).
-- `hmc_power_on_lpar`, `lpars power-on` and `power_on_lpar`/`power_lpar` no longer submit a
-  PowerOn the HMC is certain to fail (HSCL3681) when the partition is not `not activated`. An
-  activated partition — `running`, `starting` or `open firmware` — reports `already_running`
-  with a message naming its state; any other state, or an empty read, is refused with an HTTP
-  409 `HMCError` naming it, and no job is submitted. The comparison ignores case, so the CLI's
-  title-case rendering is read the same way. `force=True` still submits, and the failed job is
-  returned as before (#1162).
-- `hmc_fleet_health` (and `systems health`) failed-job records carry the identifier
-  `hmc_get_job` accepts. Each record's `uuid`, filled from the entry UUID that a V10R3 HMC
-  answers with HTTP 406 on `/rest/api/uom/jobs/{id}`, is replaced by `job_id`, taken from
-  `jobs.job_identifier` (the `Resource.JobID`). Output-contract change on a pre-release
-  surface: `uuid` is renamed rather than kept alongside, since it named the unreadable
-  identifier and no documented consumer reads `failed_jobs[].uuid`; the other health buckets
-  keep `uuid` for the resources they describe (#1173).
-- `hmc_capacity_report`, `hmc_find_placement`, `hmc_system_summary` and their CLI commands
-  report real capacity on a V10R3 HMC instead of zeros. They read the system's
-  `AssociatedSystemMemoryConfiguration` and `AssociatedSystemProcessorConfiguration`
-  containers: total is the configurable figure, free the currently available one, and assigned
-  is total minus free, so it now counts hypervisor memory and the VIOS, which the partition feed
-  omits. Partition figures no longer feed capacity, since an inactive partition reads 0. A
-  system that serves no such figure fails with an error naming it rather than reading 0.
-  `hmc_system_summary` returns `mtms` as `type-model*serial` from
-  `MachineTypeModelAndSerialNumber` and `firmware_version` as the firmware text (#1175).
-- `hmc_set_lpar_proc_compat`, `lpars set-proc-compat` and `set_lpar_proc_compat` now write
-  `lpar_proc_compat_mode` with `chsyscfg -r prof`; the HMC accepts it only on a partition profile
-  and rejected every `-r lpar` call. They change the profile named by the new `profile_name`
-  argument (`--profile-name`), or the partition's default profile from `lssyscfg -r lpar -F
-  default_profile`, and report which profile changed. `hmc_get_lpar_proc_compat` and `lpars
-  get-proc-compat` add `profile` and `profile_mode` beside `desired` and `curr` (#1167).
-- A malformed or blank header-bearing response to the vNIC, vNIC backing-device and VIOS
-  identity SSH reads now raises `HMCCLIError` naming the read and its expected fields, as the
-  SR-IOV and reference-code reads already did, instead of a bare `ValueError`. It reaches vNIC
-  add/remove preflight and PCIe-assignment prevalidation (`lpars create`, DLPAR, provision). These
-  five header-bearing reads share one helper in `ssh/commands.py` for the `No results were found.`
-  sentinel and that wrap, so the SR-IOV and `lsrefcode` messages now read `<read> response did not
-  match the expected <fields> fields: <parser detail>` (#892).
-- `hmc_modify_lpar`, `hmc_dlpar_mem` and `hmc_dlpar_proc` now state which object they change.
-  The write reaches the partition's current configuration; with `CurrentProfileSync` `Disabled`
-  the partition profile keeps its old values (live: `desired_mem` and `desired_procs` unchanged),
-  so activating a profile discards the change. The DLPAR results carry `change_location` and a
-  `warnings` list, and `hmc_modify_lpar` adds the same warning to its `warnings`; the docstrings
-  no longer claim the change always applies on next activation. Write behaviour is unchanged
-  (#1170).
-- `hmc_list_lpar_ownership` now reads the text of a `Description` element that carries an
-  attribute, which V10R3 sends as `ksv`. Every stamped partition was reported `owned: false,
-  unparsed: true` and its `description` came back as a mapping; the listing now returns the
-  text, so a stamped partition is `owned: true` with its owner. `hmc_lpar_summary` returns the
-  same text instead of a mapping, and the system-wide profile-restore ownership check, which
-  reads the listing, no longer refuses on an unreadable description (#1168).
-- The job tools' docstrings and parameter help, the server instructions and `hmcpctl jobs`
-  help now tell agents to persist the JobID and the stable `jobs/{JobID}` `job_href`, and note
-  that an entry UUID stored by an earlier release reads only through its `job_href`. ADR 0093
-  records the identifier change (#1172).
-- `hmc_get_job` and `hmc_wait_for_job` resolve the job identifiers hmcpctl hands out on a V10R3
-  HMC. `jobs.job_identifier` now prefers `Resource.JobID` over the Atom entry UUID, which that
-  HMC answers with HTTP 406 on `/rest/api/uom/jobs/{id}`; `JobOutcome.job_id` and the power,
-  migration and decommission outcomes carry the JobID. A `job_href` in the SELF-link shape the
-  HMC reports on every read, `/rest/api/uom/jobs/{JobID}/{uuid}`, is accepted and read through
-  its JobID segment: the HMC refuses that link as a request URL and its trailing UUID changes on
-  every read, so it is never requested. An outcome's `job_href` taken from a read is reduced to
-  the same stable `/rest/api/uom/jobs/{JobID}` link, and the entry parser no longer lets the
-  HMC's malformed relative `nulljobs/{JobID}` SELF link displace the real one. The job-path
-  refusal still runs on the path that is requested. An entry UUID stored by an earlier release still reads
-  through a supplied link, with the mismatch warning naming that cause. The bare-cec live arm
-  expects `osshutdown` on a partition with no RMC to fail with the observed `HSCL0DB4` (#1160).
-- The HTTP 406 errors for LPAR writes and virtual-network create no longer tell the operator to
-  set `HMC_SCHEMA_VERSION=V1_0`. Cause (2) now names the `X-HMC-Schema-Version` request header,
-  says the client decides per call site whether to send it, and directs the operator to report a
-  client defect instead of changing environment settings; the tests pin that the variable is
-  not recommended (#888).
-- `create_and_stamp_lpar` (and so `hmc_create_lpar` and provisioning) no longer drops a requested
-  profile apply silently when the REST create succeeds. That path creates no profile, so the
-  result now carries a skipped `apply_profile` step and a warning saying the apply was not
-  performed (#1083).
-- The vNIC snapshots in `vnic_before`/`vnic_after` from `network add-vnic`/`hmc_add_vnic` and
-  `network remove-vnic`/`hmc_remove_vnic` report each embedded backing's `is_active` and
-  `status` from the HMC's `backing_device_states`, joined by logical port ID. Before, they were
-  always `false` and empty. A `backing_device_states` value that is malformed or does not
-  correspond to the `backing_devices` ports now raises a `ValueError` (#1133).
-- `network list-vnics`/`hmc_list_vnics` return an empty list for a partition with no vNICs.
-  Before, the HMC's `No results were found.` reply came back as a one-key row
-  (`{"No results were found.": ""}`) (#1132).
-- `network add-vnic`/`hmc_add_vnic` can add a partition's first vNIC. The vNIC read now treats
-  the HMC's `No results were found.` reply as an empty list; before, it failed as a header
-  mismatch, so the add's preflight refused every partition with no vNICs. The same read backs
-  `network remove-vnic`/`hmc_remove_vnic`: removing a partition's last vNIC is now verified
-  rather than reported as a partial failure, and a remove on a partition with no vNICs returns
-  an unchanged result instead of an error (#1111).
-- The `HMC_AUTHORIZE_POWER_OPERATIONS` description and environment-variable page no longer say
-  the guard requires a managed-system selector: it derives the owning system when the selector
-  is omitted, and an `ownership_override` skips that walk, the SSH read and the name reads
-  (#1117).
-- LPAR create, provision and modify, and `network add-vnic`/`hmc_add_vnic`, refuse an SR-IOV
-  logical-port or vNIC-backing capacity that is not a multiple of the physical port's Ethernet
-  capacity granularity before any HMC change, with the #1035 message. Each requested capacity
-  is checked on its own, not their per-port sum. Before, the partition was created and the HMC
-  then refused the port (`HSCL1294`), leaving a partial LPAR (#1081).
-- `lpars provision`/`hmc_provision_lpar` and `storage attach-disk`/`hmc_attach_disk_to_lpar` no
-  longer add a vSCSI client adapter before mapping the disk. The mapping makes the HMC create
-  its own client/server adapter pair (ADR 0169), so the added adapter was left unpaired on
-  every run. Their `steps` no longer include `vscsi` (#1030).
-- Shared UOM `PUT`/`POST` writes now send `Accept: */*` with the typed `Content-Type`, and
-  shared `DELETE`s send `Accept: */*`, the header shape HMC V10R3 accepts; it answered the old
-  typed `Accept` with HTTP 406 (ADR 0178). `adapters add-vscsi` and `adapters delete` were
-  verified on V10R3; the other shared writes were not probed. `lpars create` and `lpars provision` still fall back to `mksyscfg`
-  when V10R3 now answers the REST create with a 400 `REST0001` schema rejection instead of the
-  406 (#935).
-
-- `storage detach-mapping` and `unmount-optical-media` (`delete_storage_mapping`) now use the
-  same grouped-GET / If-Match read-modify-write as a mapping create (ADR 0169), instead of a
-  full VIOS GET and an unconditional system-scoped POST that could silently overwrite a mapping
-  another client added or removed between the GET and the POST. A GET with no `ETag` is refused
-  before any POST, and a 412 is reported as a concurrent change with nothing written. The
-  existing detach guards are unchanged: exactly one matching mapping, and its client-partition
-  link must name the authorized LPAR. `_append_vios_mapping` is generalized into `_rmw_vios_mapping`,
-  shared by both the create and detach paths (#1037).
-
-- `storage map` and `mount-optical-media` now build a new mapping's client-LPAR href
-  system-scoped (`.../ManagedSystem/<sys>/LogicalPartition/<lpar>`), matching every href the HMC
-  itself has been observed to emit (ADR 0179), instead of the root-scoped form the HMC never
-  emits. The managed-system UUID comes from the grouped VIOS GET the read-modify-write already
-  performs; a VIOS response missing that link fails the create closed, before any POST (#1036).
-
-- LPAR rename (`hmc_rename_lpar`), DLPAR processor and memory changes (`hmc_dlpar_proc`,
-  `hmc_dlpar_mem`) and `lpars modify` / `hmc_modify_lpar` now write on V10R3. Each reads the
-  whole partition and writes it back under `If-Match` with only the requested fields changed,
-  the read-modify-write the boot order already used. V10R3 rejected the previous sparse
-  documents, so these operations wrote nothing. Rename and the modify workflow no longer send
-  the create builder's default `PartitionType`. Processor changes now refuse, before any write:
-  a `dedicated` value that differs from the partition's current mode, and virtual processor
-  counts, `uncapped` or a fractional processor count on a dedicated partition. `UncappedWeight` is no longer set on capping,
-  because V10R3 drops it; uncapping a capped partition leaves the weight 0, and no parameter
-  sets it. A name containing a character XML 1.0 cannot carry is refused before any request,
-  a negative or non-finite memory or processor value is refused before the write, a DLPAR
-  call with no processor or memory field is refused, and the processor DLPAR ignores memory
-  fields as the memory DLPAR ignores processor fields. `HMCClient.modify_logical_partition`,
-  `build_dlpar_proc_document` and `build_dlpar_mem_document` are removed (#1057).
-
-- The live-test runner's ST18 asserts a same-name ISO re-upload is refused with a name
-  collision, instead of expecting a `status: "existing"` dedup hit `hmc_upload_iso` has never
-  returned. The re-upload reuses the ST18 name, so the collision guard
-  (`_refuse_existing_media`) refuses it before any download — no second multi-GiB transfer —
-  and a successful upload now records FAIL instead of a PASS row whose note contradicted it.
-  The unused `LIVE_TEST_ISO_HTTP_MEDIA_NAME` setting is removed (#1053).
-
-- The ISO upload no longer times out while the HMC finishes taking a large ISO. The HMC answers
-  the web File contents PUT only after it has taken the whole file: 14.8 s after the last byte of a
-  4.2 GB ISO, longer for a larger one. That response now gets its own wait, `HMC_UPLOAD_TIMEOUT`
-  (TOML `upload_timeout`, default 600 s, never shorter than `HMC_TIMEOUT`). A timeout there says the
-  HMC may still import the ISO (#1055).
-
-- Three `client_storage` XML parse sites (VIOS mapping read-modify-write, storage-mapping
-  delete, and VolumeGroup read) now catch `DefusedXmlException` alongside `ParseError`, so an
-  HMC body carrying a DTD, entity, or external reference raises `HMCError` naming the request
-  instead of escaping as a raw parse exception (#1054).
-
-- `storage detach-mapping` and `storage unmount-optical-media` (and mapping/optical-mapping
-  create) no longer refuse on a live HMC. The VIOS identity check read a `<UUID>` child no
-  observed HMC response carries; it now reads `Metadata/Atom/AtomID`, cross-checking
-  `PartitionUUID` when present, and still refuses a document naming a different VIOS or more
-  than one (#979).
-
-- A `ConsoleSession` whose hold another client ended, with a manual `rmvterm` or a
-  `take_over=True` session, no longer ends that client's session when it closes. The session
-  recognizes the HMC's report of the loss, raises the new `ConsoleHoldLostError` on the next
-  read, and `close()` returns `False` without issuing `rmvterm`, including when the report
-  arrived but was never read; a report still in transit when the session closes (about 1.5 s
-  on V10R3) is not seen. A bounded capture reports the loss as `stop_reason="error"`
-  with a `ConsoleHoldLostError` error, and `lpars capture-console` and `hmc_capture_lpar_console`
-  no longer advise running `rmvterm` then; exit code 3 is unchanged (#1004).
-
-- A console session now releases its hold by closing `mkvterm`'s stdin instead of running
-  `rmvterm`. Live captures on V10R3 showed that stdin EOF ends only the session's own `mkvterm`
-  and leaves the other client's session intact in every captured ordering, so a loss report still in
-  transit at close no longer lets the release end a new holder's session. `ConsoleSession.close()`
-  and `suspend()`, `WritableConsoleSession`, the bounded capture and `hmc_capture_lpar_console`
-  wait about 10 s longer for the HMC to answer EOF. `rmvterm` still runs when the stream had
-  already ended or does not end within 20 s, and the independent probe still decides `released`
-  (#1058).
-
-- The probe that proves a console release now releases its own hold through stdin EOF too,
-  instead of closing its connection and running `rmvterm`. A client that ran `mkvterm` just after
-  the probe closed its connection could lose its session to that `rmvterm`. On V10R3 such a client
-  is now refused with the contention message until the probe's `mkvterm` exits, about 10 s after
-  EOF, and then acquires and keeps its session. Every proven release takes about 8.5 s longer, so
-  a `close()` or `suspend()` on an open stream takes about 22 s. `rmvterm` still runs when the
-  probe's stream had already ended or does not end within 20 s (#1072).
-
-- LPAR ownership resolution (`_partition_name`, `resolve_lpar_ownership_names`,
-  `_resolve_system_name`) now rejects a non-string or whitespace-only `PartitionName`/
-  `SystemName` the same way `resource_identity`'s validated readers do, instead of coercing or
-  passing it through by hand (#1026).
-
-- `lpars clear-boot-order` and `hmc_clear_lpar_boot_order` refuse after authorization and
-  write nothing, instead of sending an empty `PendingBootString` that V10R3 rejects with HTTP 500
-  `REST0126`. No REST or `chsyscfg` form tried on V10R3 clears it. A profile activation consumed
-  the pending boot order when observed; `set-boot-order` replaces it (#1048).
-
-- `lpars read-boot-order` and `hmc_read_lpar_boot_order` request the `Advanced` group and
-  return each boot field as a string, or `null` when empty, instead of the element's attribute
-  dict. `set-boot-order` and `clear-boot-order` (and their MCP tools) no longer POST a sparse
-  `LogicalPartition` with a misplaced `PendingBootString`, which V10R3 rejects: they read the
-  whole partition, set `BootListInformation/PendingBootString`, and POST it back with
-  `If-Match`, refusing when the read carries no ETag. The boot order is now Open Firmware
-  device paths, the form `read-boot-order` reports in `boot_device_list`, not the `cd`,
-  `disk` and `network` selectors; the CLI takes them as positional arguments (#980).
-  `clear-boot-order` now refuses instead (#1048).
-
-- `lpars create` reports each requested PCIe assignment as `skipped` when the create returns no
-  partition body — including when the post-create read-back raises (#1014) — instead of omitting
-  the requested assignment steps entirely (#1019).
-
-- `create_and_stamp_lpar` under `stamp_policy='required'` includes the unapplied-profile warning
-  in each raised error — read-back failed, no body, and stamp not confirmed — instead of omitting
-  whether the preceding profile apply succeeded (#1020).
-
-- `storage upload-iso` and `hmc_upload_iso` upload through the HMC web File API, which V10R3
-  accepts, instead of a `BrokeredFile` document it rejects. They report `uploaded` only once
-  the repository lists the media, and refuse a volume group without a media repository before
-  downloading (ADR 0177, #978).
-
-- `HMCError` extracts `<Message>` from the untruncated HMC error body before truncating the
-  stored body to `MAX_ERROR_BODY_BYTES` (4096). Before, a body over 4096 bytes was cut first,
-  which could leave malformed XML with the `<Message>` element past the cut, so the message was
-  lost and the fallback printed an unhelpful body prefix instead (#982).
-
-- When the HMC read-back of a partition fails after an `mksyscfg` create, `create` and
-  `provision` report the partition as created, with its profile-apply step and a warning naming
-  the read-back error. Before, they reported a failed create with nothing created (#1014).
-
-- The apply-error warning from `create` and `provision` says "redo any skipped steps" instead of
-  "redo any skipped assignment steps". Since #999, a failed apply during `provision` also skips
-  network, vSCSI, storage, power-on and affinity-policy steps, which the old wording didn't
-  cover (#1013).
-
-- `hmcpctl lpars provision` and `hmc_provision_lpar` apply the new partition profile after a
-  `mksyscfg` create, as `lpars create` does, and report it as an `apply_profile` step. Before
-  this, provision's network step failed with `REST0269` on such a partition. A failed apply skips
-  the remaining steps and leaves the partition in place. There is no opt-out (#999).
-
-- `hmc_create_volume_group` and `hmcpctl storage create-vg` send `GroupName` with `kb="CUR"`,
-  the value a live V10R3 `VolumeGroup` carries, instead of `kb="CUD"`. A test pins the create
-  document against a redacted V10R3 `VolumeGroup` capture (#1001).
-- `hmcpctl storage create-media-repo`, `storage create-media`, `hmc_create_media_repository` and
-  `hmc_create_optical_media` convert `size_mib` to the GiB the HMC's `RepositorySize` and media
-  `Size` take. They previously sent the MiB value unconverted, so `--size-mib 20480` asked for a
-  20 TiB repository. A size that is not a multiple of 1024 MiB is now refused before the volume
-  group is read or changed.
-  The existing-repository check compares in GiB, `get-media-repo` labels the size GiB, and
-  `list-optical-media` reads the medium's `Size` element, which the HMC reports in GiB, instead
-  of the absent `MediaSize`, and returns it as `size_mib`. The short live-test repository default
-  (`LIVE_TEST_VMEDIA_SHORT_REPOSITORY_SIZE_MIB`) is now 1024, and the live-test runner refuses
-  either repository size at config load when it is not a multiple of 1024 (#963).
-
-- `hmc_create_virtual_disk`, `hmc_delete_virtual_disk` and `hmcpctl storage create-disk` /
-  `delete-disk` no longer POST a sparse `VolumeGroup` document, which V10R3 rejects at schema
-  validation and which omitted the group's existing disks and physical volumes. Both now read the
-  volume group, add or remove exactly one virtual disk, and write the whole group back with
-  `If-Match` set to the read's ETag. They refuse without writing when the read carries no ETag,
-  when create names a disk the group already holds, or when delete matches no disk or several. An
-  HMC 412 (stale ETag) is reported as a concurrent change with nothing written. HMC enforcement of
-  a mismatched ETag and delete by omission are not yet live-verified (#936).
-  `hmc_delete_virtual_disk` also refuses a disk that backs a vSCSI mapping named inline by
-  `DiskName`, the shape V10R3 returns; the mapped-disk check previously matched only an `href`
-  the HMC does not send.
-- `hmc_create_media_repository`, `hmc_create_optical_media`, `hmc_delete_media_repository`,
-  `hmc_delete_optical_media` and their `hmcpctl storage` commands write the volume group back
-  with `If-Match` set to the read's ETag, as the virtual-disk writes do. Without it, a media
-  write racing a virtual-disk write could post the group as it was before that write, restoring a
-  deleted disk or dropping a created one. They now refuse without writing when the read carries
-  no ETag, and an HMC 412 is reported as a concurrent change with nothing written. HMC
-  enforcement of a mismatched ETag on this path is not yet live-verified (#996).
-- `hmc_delete_media_repository` and `hmcpctl storage delete-media-repo` refuse, with nothing
-  written, when the read they write from still holds a `VirtualOpticalMedia`. The prior check
-  read the repository once to confirm it was empty and read it again to delete it; a medium
-  created between those two reads was deleted along with the repository without the refusal ever
-  firing. The second read now carries its own refusal, closing that window (#1012).
-- `hmcpctl storage create-disk`, `storage attach-disk` and `hmc_create_virtual_disk` refuse a
-  disk name longer than 15 characters before the create request, with a message that states the
-  VIOS backing-device limit. Such a name previously reached the VIOS, failed with HTTP 500 and was
-  reported as a possible side effect (#964).
-
-- The SSH UUID-to-name lookups behind `hmc_capture_lpar_console` and `hmcpctl lpars
-  capture-console`, the SSH selector fallbacks, VIOS install, and the `lpars create` and
-  ownership name fallbacks send the HMC CLI attributes `uuid,name`. They sent
-  `UUID,PartitionName` or `UUID,SystemName`, which the HMC rejects as invalid attributes, so a
-  partition UUID selector failed (#776).
-
-- `hmcpctl storage list-mappings` and `hmc_list_storage_mappings` no longer fail with "no usable
-  UUID" on a real VIOS: the HMC sends no mapping `UUID`. A mapping is identified by its server
-  adapter and target device (`id`, for example `vhost0/vtscsi0`; `null` when the VIOS does not
-  report both), replacing the `uuid` field. `storage detach-mapping` and
-  `hmc_detach_storage_mapping` take that value as `mapping_id` (was `mapping_uuid`), with no
-  alias, and detach and `unmount_optical_media` refuse a mapping whose LPAR is not the one
-  authorized. Client-LPAR links are read from the HMC's absolute
-  `.../ManagedSystem/<system>/LogicalPartition/<uuid>` href, so `--lpar` filters, the listed
-  `lpar_uuid`, and detach authorization now work against a real HMC (ADR 0168, #940).
-
-- A blank or whitespace-only optional managed-system selector (`--system ""`, or
-  `system_name_or_uuid: ""` from an MCP client) now reads as omitted on the read and resolve paths,
-  as ADR 0094 already read it on guarded mutations. `adapters list`, `storage attach-disk`, LPAR
-  and VIOS listing, `hmc_list_lpar_ownership`, and PCM LogicalPartition targets used to look up a
-  managed system named `''` and fail; PCM ManagedSystem targets refused `''` as a stray scope.
-  Unguarded VIOS and LPAR mutations given a blank selector (VIOS delete, power, update and
-  upgrade; LPM; storage mappings; LPAR power when `HMC_AUTHORIZE_POWER_OPERATIONS` is off) now
-  resolve the partition across all systems, as if the selector were omitted, instead of failing
-  on a system named `''`.
-  A selector that is required refuses a blank one as missing before any HMC call: VIOS backup and
-  restore, the boot-order read, and a PowerOn with an affinity assessment. A non-blank selector
-  loses its surrounding whitespace on these paths, so an affinity assessment whose captured
-  identity is padded no longer matches (#945).
-
-- `hmcpctl storage attach-disk` and every `hmcpctl adapters` subcommand (`list`, `add-network`,
-  `add-vscsi`, `add-vfc`, `delete`) accept `--system/-s` and pass it to the operation. They had no
-  way to scope the LPAR lookup, so the mutating paths walked every managed system for the LPAR's
-  parent, which on a large HMC can hit the 30 s parent-discovery bound (#937).
-
-- SR-IOV logical-port assign and unassign no longer report an HMC refusal as "could not be
-  verified". When the dispatched `chhwres`/`chsyscfg` command errors and the immediate readback
-  matches the pre-mutation state exactly, `SriovLogicalPortPartialError` now reports the HMC's own
-  failure text as a refusal; a missing, mismatched, or unreadable readback (or a command error
-  whose readback also changed) keeps the existing "could not be verified" wording, since the
-  state there is genuinely uncertain (ADR 0056, #966).
-
-- `hmcpctl lpars summary`, the LPM commands `lpars migrate`, `migrate-affinity`,
-  `migrate-validate`, `migrate-abort` and `migrate-recover`, and `hmcpctl vios power-on` /
-  `power-off` accept `--system/-s` and pass it to the operation as the managed system (the
-  migration source for the LPM commands). They hard-coded no scope, so a name lookup on a large
-  HMC could hit the 30 s parent-discovery bound with no way to narrow it (#946).
-
-- The `mksyscfg` create path used by `hmcpctl lpars create` and by `hmc_create_lpar`'s HTTP 406
-  fallback no longer sends its 0.1 processing-unit default with more than one virtual processor.
-  The HMC rejected that profile with HSCL0622. On that path, a create with `--vcpus` or
-  `--min-vcpus` above 1 now needs `--procs` or `--min-procs` (`desired_procs` / `min_procs`),
-  and without them it is refused before `mksyscfg` runs. The refusal includes two virtual
-  processors, a count some platforms may accept at 0.1 units, because the per-processor minimum
-  is not recorded here (#938).
-
-- The same `mksyscfg` create path also refuses its `max_proc_units` default
-  (`max(desired_proc_units, 2.0)`) when `--max-procs` is omitted and it would exceed
-  `--max-vcpus`: a virtual processor can use at most 1.0 processing unit, so `--max-vcpus 1`
-  cannot cover the 2.0-unit default. The refusal names `--max-procs`, mirroring #938's
-  min/desired guard for the opposite bound. A large `--max-vcpus` still keeps the default; no
-  per-processor minimum is derived from it, for the same reason as #938 (#949).
-
-- The same `mksyscfg` create path now honours `--dedicated` (`dedicated=True`). It always sent a
-  shared-processor record, so the partition was created with shared processors and no error.
-  A dedicated create now sends `proc_mode=ded` with whole `min_procs` / `desired_procs` /
-  `max_procs` counts from `--min-procs` / `--procs` / `--max-procs`, and no processing units or
-  virtual-processor counts. An explicit `sharing_mode` is sent when it is a dedicated value
-  (`keep_idle_procs`, `share_idle_procs`, `share_idle_procs_active`, `share_idle_procs_always`).
-  A fractional count, or a shared-only `sharing_mode` (`capped`, `uncapped`), is refused before
-  `mksyscfg` runs (#948).
-
-- The live-test scratch LPAR create (ST8) passes explicit processing units, so its multi-vCPU
-  create is no longer refused on the `mksyscfg` fallback. `.env` now requires
-  `LIVE_TEST_SCRATCH_CREATE_DESIRED_PROCS` and `LIVE_TEST_SCRATCH_CREATE_MAX_PROCS`: finite,
-  positive, desired no greater than max. A results document written before these keys existed
-  no longer restores artifacts into a later run; the runner warns and continues (#947).
-
-- SR-IOV and vNIC operations admit an HMC only when `lshmc -V` reports exactly Version 10,
-  Release 3 and Service Pack 1060, the fields the dedicated PCIe gate already matched. The
-  check used to pass on `V10R3 M1060` anywhere in the output — a later service pack that still
-  lists an M1060 fix line — and on field prefixes such as `Service Pack: 10600`; both are now
-  refused (#911).
-
-- `console info` reports the actionable firmware error on the HMC levels that 500 on the
-  unfiltered `ManagementConsole` feed. `get_console_info`'s guard required the literal
-  `null SessionId`, which no firmware level has been observed to send: the error reads
-  `Nested path contains null property , currentProperty=SessionId` and then the nested path,
-  so the guard had never fired and the operator saw the raw HTTP 500 transport error. The
-  guard now matches `Nested path contains null property`, the same live-confirmed text the
-  two managed-system guards beside it already use (ADR 0138), and reads it from the response
-  body rather than from the rendered detail those two match: `str(exc)` shows only the first
-  `Message` element of an XML body, or its first 500 characters when the body is not XML,
-  and no raw body for this endpoint has been captured yet — every error recorded for this
-  defect class so far puts the marker where either surface would find it, so the XML shape
-  the new test carries is hypothetical until a live capture settles it. Its message names a
-  null property rather than a null `SessionId`, because the match no longer establishes
-  which property it was. An HTTP 403 still propagates untranslated even when it carries
-  the same text, and so does an unrelated HTTP 500 (#880).
-
-- Virtual-disk create and attach keep their `capacity_mib` inputs, but the HMC
-  VolumeGroup document now emits the integral GiB value V10R3 expects. Invalid,
-  non-integral GiB requests fail before dispatch. VolumeGroup inventory now exposes
-  `capacity_gib` and `free_space_gib`; an impossible free-space reading is null with
-  `free_space_diagnostic="free_space_exceeds_capacity"` (#779).
-
-- The live runner's SR-IOV scenarios now dispatch `adapter_id`, `physical_port_id` and
-  `logical_port_id` as the `str` the tools declare. Every SR-IOV call was passing the
-  numeric config value, so each failed pydantic validation before reaching the HMC
-  (`Input should be a valid string`) and the ST23 baseline aborted, starving every
-  dependent SR-IOV subtask. The same mismatch also made `_adapter_is_healthy` and
-  `_logical_port_is_configured` compare a number against the `str` the tools project,
-  which is never equal — so a port still configured after cleanup would have reported
-  as unconfigured, a wrong answer in a cleanup assertion rather than a loud failure
-  (#763).
-
-- The live runner's static dispatch guard now checks argument *types* against the
-  served tool schema, not only argument names. It reads the type of every literal,
-  config-backed, converted and f-string argument at each dispatch site and fails the
-  build on a mismatch, which is what would have caught the SR-IOV defect above before
-  it reached hardware. A dispatch naming a config field that does not exist is
-  reported rather than passed over, and the guard asserts a floor on how many
-  arguments it actually type-checks, so a change that quietly stops reading a class
-  of arguments fails instead of reading as a clean run (#763).
-
-  The same check runs at dispatch time in a live run, where it is now stricter than
-  the transport: FastMCP validates in pydantic's lax mode and would coerce `"5"` or
-  `5.0` into an `int` parameter, whereas the runner reports `InvalidDispatch` and
-  never reaches the HMC. That is the intended direction — a harness defect should
-  stop at the harness — and no current dispatch site relies on the coercion (#763).
-
-- `list_volume_groups` and `list_optical_media` no longer fail on a well-formed HMC
-  reply that reports a quantity with a fractional part. `GroupCapacity`, `FreeSpace`
-  and `MediaSize` were admitted only by `str.isdecimal()`, which is false for any
-  string containing `.`, so hardware returning `279.25` raised
-  `HMCError: list_volume_groups returned an invalid GroupCapacity` even though the
-  REST call had succeeded. These fields now accept a plain non-negative decimal and
-  widen to `float | None`; an integral value is still returned as `int`, so rendered
-  output is unchanged for hardware that reports whole numbers. A value that is not a
-  plain decimal — a sign, an exponent, `nan`, `inf`, non-ASCII digits, a trailing
-  newline, or any non-numeric text — still raises, and bools are still rejected.
-  Accepted widths are bounded at 20 integer and 10 fractional digits, beyond any real
-  storage quantity, so a digit string long enough to exhaust `int()` or saturate
-  `float()` to `inf` is rejected as malformed rather than parsed (#762).
-
-- The live-test runner restores the test partition's description, and with it the ownership
-  stamp, after ST10 and ST15. The baseline kept the CLI read's trailing newline, which the
-  restore refused as non-printable, so the partition lost its stamp and every
-  ownership-guarded command then refused it. The baseline now drops one trailing line
-  terminator. A description that cannot be written back through the CLI now fails the run
-  with a `MANUAL RECOVERY REQUIRED` row naming the `chsyscfg` restore, not a SKIP (#968).
-
-- The live-test runner no longer rejects `LIVE_TEST_SRIOV_PHYSICAL_PORT_ID=0`. Physical
-  port IDs are zero-indexed on Power SR-IOV hardware, so port 0 is the first and most
-  common port, but it was covered by a strictly-positive check that aborted the run
-  during configuration parsing — before the runner reached the HMC. Adapter and logical
-  port IDs keep the positive check; the physical port ID is now bounded at zero (#708).
-
-- The live-test runner's failure redactor no longer replaces a filename such as `config.toml`
-  with `<REDACTED-HOST>`, which made a config warning read as if a host had been hidden. A
-  single-dot name ending in a common file extension that is not a DNS top-level domain stays
-  readable; every multi-label name, and any name ending in a real TLD such as `.py` or `.md`,
-  is still redacted (#914).
-
-- The live-test runner's failure redactor now replaces a hostname whose labels contain an
-  underscore in full. `lab_hmc01.example.com` was printed as `lab_hmc01.<REDACTED-HOST>`,
-  leaving the label that names the machine readable (#927). Dotted identifiers containing an
-  underscore, such as a module path or `test_live_runner.py`, are now redacted too.
-
-- The live-test dedicated PCIe arm no longer takes a single HSCL8012 ("partition not found")
-  after a failed create as proof that nothing was created. It re-reads once after a short delay
-  and confirms absence only on a second HSCL8012, so a partition whose create was still in
-  flight is found and cleaned up rather than left holding the slot. A create-time probe whose
-  absence cannot be confirmed now says in its manual-recovery row that the run will not retry
-  its cleanup (#906).
-
-- `load_profile` no longer reports a missing config file as "no default_profile set". An
-  explicit `config_path` that does not exist, or an absent platform config file when nothing
-  requests a profile (no `--profile`/`HMC_PROFILE`), now raises `ConfigFileNotFoundError`
-  naming the path it looked for. A file that exists but has no `default_profile` and no
-  requested profile keeps its existing message, and a request for a specific profile against
-  an absent file still reports the profile as not found (#915).
-
-- When no slot is pinned, the live-test dedicated PCIe arm no longer auto-selects a slot that a
-  partition profile lists but no partition owns. The assignment refuses such a slot, so the arm
-  recorded a FAIL unrelated to the change under test. It now picks the first slot that is
-  unowned in inventory and listed by no profile, read with the admitted profile table, and
-  SKIPs with the reason when none qualifies or the table cannot be read. Preflight predicts the
-  same rule (#916).
-
-- The live-test dedicated PCIe arm's admitted-environment gate (ST29) no longer matches the
-  HMC release by substring. It now uses the product's exact `lshmc -V` Version, Release and
-  Service Pack comparison (ADR 0166), so a later service pack such as `10600`, or one whose
-  output still lists an `M1060` fix line, SKIPs the arm instead of running profile mutations
-  on an environment the repository does not admit (#928).
-
-- `scripts/live_test_preflight.py`'s dedicated-arm verdict now predicts the `st36-io-slots`
-  scenario (#985) too, not only the fixture's own dedicated slot: it names the two further spare
-  slots the scenario will mutate when no DRC index is pinned, and states the scenario will SKIP
-  when one is. Previously preflight showed one mutated slot while an unpinned run touched three
-  (#1000).
-
-- The live-test runner's round2 provisioning subtasks (13 and 14) no longer depend on lab
-  fixtures a fresh lab lacks. Two new required `.env` keys set the provisioned partition's VLAN
-  (`LIVE_TEST_PROVISION_VLAN_ID`, which must already have a virtual network) and the test-disk
-  size (`LIVE_TEST_PROVISION_DISK_MIB`, a multiple of 1024). Subtask 14 lists the virtual
-  networks and stops before deleting the test partition when the VLAN is not there, and
-  `scripts/live_test_preflight.py` reports a VLAN with no virtual network (#970).
-- `hmc_create_lpar`, `hmc_modify_lpar` and `hmc_set_lpar_memory` (and their CLI and library
-  equivalents) refuse a `desired_memory` above the managed system's own
-  `ConfigurableSystemMemory` before any write, naming both values in MiB. `mksyscfg` used to
-  store the oversize profile and the failure surfaced only at activation. A modify or DLPAR
-  memory call that names no managed system is not checked, because that path does not resolve
-  one (#1166).
+- `python -m hmcpctl` now runs the CLI, as an alias for the `hmcpctl` console script wherever
+  the `app` extra is installed — like the console script, it needs that extra and fails the
+  same way without it. It delegates to the same entry point and takes no arguments of its own,
+  so the two remain one program; the program name Typer reports differs. One difference does
+  matter operationally: `-m` places the current working directory first on `sys.path`, where
+  the console script does not, so prefer `hmcpctl` for a served process and use
+  `python -P -m hmcpctl` (or `PYTHONSAFEPATH=1`) when launching from a directory you do not
+  control. The live audit proof uses it because the generated console script cannot be relied
+  on to exec with stderr closed once the interpreter path is long enough that `uv` emits a
+  `/bin/sh` trampoline (#709, ADR 0128).
+- A warning-level `install-submitted` audit event now carries the remote PID returned by a
+  detached `installios` submission to served operators (#544, ADR 0109).
+- Serve startup now submits a warning-level `power-ownership-guard` audit record for every
+  policy-reachable connection, preserving the effective guard value when the permissions
+  inspection tool is withheld (#533, ADR 0107).
+- Seven bounded SSH-backed VIOS label tools list, set, and remove individual FC-port
+  labels and list, create, update, and remove individual vFC group labels using the
+  POWER10 and POWER11 `lslabelvios`/`labelvios` grammar. They do not expose MSP,
+  vNIC, vSCSI, override-default, bulk-removal, or adapter-mutation behavior. Issue
+  #559 tracks live-system field and mutation evidence not established by the manuals.
+  The matching `hmcpctl vios` commands are `list-fc-port-labels`,
+  `set-fc-port-label`, `remove-fc-port-label`, `list-vfc-group-labels`,
+  `create-vfc-group-label`, `update-vfc-group-label`, and `remove-vfc-group-label`.
+- `ManagedSystemPatch` and `LpmMigrationRequest` provide reusable typed request
+  values for managed-system configuration and LPM destination inputs.
+- `VirtualNetworkResult` exposes the resolved managed-system UUID beside the
+  resource returned by `create_virtual_network`.
+- `DecommissionBlastRadius` and `DecommissionAdapterRecord` expose the fixed
+  `DecommissionResult.blast_radius` inventory schema to reusable Python callers.
+- `StorageMapResult` records the authorized LPAR UUID beside the resource returned by
+  `map_storage`, so library and CLI callers no longer resolve the partition independently
+  before the guarded storage operation (ADR 0104).
+- `VolumeGroup`, `OpticalMedia`, and `StorageMapping` provide stable storage
+  inventory values for reusable Python callers (ADR 0117).
+- Opt-in ADR 0011 ownership guard on LPAR power operations (#371, ADR 0092 §4): the new
+  `authorize_power_operations` setting (`HMC_AUTHORIZE_POWER_OPERATIONS`, TOML profile key
+  `authorize_power_operations`) defaults to `false`, leaving the `power_lpar` call path
+  unchanged and opening no SSH connection. When `true`, `power_lpar` reads the ownership
+  token before submitting the job and refuses a partition another agent owns; it accepts a
+  new `ownership_override` parameter with the same audited semantics as its guarded
+  siblings. `system_name_or_uuid` stays optional (ADR 0063): the guard routes through
+  ADR 0094's shared resolve chain, which derives the owning managed system by bounded
+  parent discovery when the caller omits it and confirms the partition lives on the
+  named system when they supply it. `hmc_power_on_lpar`, `hmc_power_off_lpar`, and
+  `hmcpctl lpars power-on` / `power-off` gained the matching `ownership_override`
+  argument, and the two CLI commands gained `--system`, which replaces the fleet walk
+  with one read. `provision_lpar` passes the override on its own activation leg, which
+  targets the partition that workflow just created and stamped. Both new parameters move
+  the frozen public signature digest.
+- `HMCConfig.from_mapping(values)`: environment-isolated construction for library
+  consumers (#368, ADR 0096). `HMCConfig` is a pydantic-settings model with
+  `env_prefix="HMC_"`, so the ordinary constructor resolves every field a caller leaves
+  unset from the ambient process environment — right for the CLI and the MCP server,
+  wrong for a process building one config per HMC from database rows, where a stray
+  `HMC_HOST` silently retargets a backend, a stray `HMC_SSH_KEY_FILE` offers the wrong
+  key, and a stray `HMC_AGENT_ID` corrupts ADR 0011 ownership attribution.
+  `from_mapping` reads no environment variable and no dotenv file; every field the
+  mapping omits takes its declared default. `load_profile` is unchanged —
+  environment-over-TOML precedence on the operator path is deliberate. **Note:**
+  `_env_file=None` is *not* an isolation mechanism — it suppresses a dotenv source, never
+  the environment, and `HMCConfig` configures no dotenv source at all, so it does nothing.
+  `docs/environment-variables.md` gains a "Library Consumers" section covering precedence
+  and the isolation pattern.
+- Cross-process job polling: the `get_job` and `wait_for_job` operations in the new
+  `hmcpctl.operations_jobs` module, plus the `JobOutcome` facade export (#364, ADR 0093). The
+  supported handle for a job is two persistable strings — `job_id` and an optional `job_href` —
+  so a consumer can store them, restart, construct a fresh `HMCClient`, and poll from a different
+  process than the one that submitted the work. A job the HMC no longer knows about (reaped,
+  deleted, or never present) now returns `found=False` instead of an opaque HTTP 404 `HMCError`,
+  which is what lets a restarted worker tell "still running" from "gone". `JobOutcome` gained the
+  `found: bool` and `job_href: str | None` fields. Neither has a default — that keeps both in the
+  `required` set of the MCP output schema the wait tools share — so any direct construction of
+  `JobOutcome` from the previous five fields must now supply them. Its field set is a package-owned
+  model contract under ADR 0029, except `job`, which stays an opaque HMC resource mapping. The
+  handle and `found` semantics above describe outcomes returned by `get_job` and `wait_for_job`;
+  the submitting operations share the type but report a submission, so their `job_id` may be a
+  synthetic label and their `found=False` means "this submission returned no job entry"
+  (ADR 0093 clause 3).
+- `set_lpar_ownership_description` operation and facade export (#376, ADR 0066).
+- Strict LPAR ownership stamping (#377, ADR 0067): `provision_lpar` accepts a new
+  `stamp_policy` field on `LparCreation` with literal alternatives `"best-effort"` (default) and
+  `"required"`.
+- Audit sink emits a `tls-verification-disabled` event when TLS verification is off, as
+  controlled by `HMC_VERIFY_SSL` (#379).
+- `list_lpar_ownership` operation, facade export, and `hmc_list_lpar_ownership` MCP tool
+  (#375, ADR 0071): parsed ADR 0011 ownership per LPAR from the REST bulk list feed — one
+  call covers every partition on a managed system. Partitions with no description
+  (REST `<Description>` element absent), a non-token description (`unparsed`), and a valid
+  ownership stamp (`owned`/`owner`) are reported as distinct facts; none are dropped.
+- Bounded, non-interactive LPAR console capture: `capture_lpar_console`
+  operation, `ConsoleCapture` / `ConsoleHeldError` facade exports, and the
+  `hmc_capture_lpar_console` MCP tool (#385, ADR 0072). Runs `mkvterm` over a
+  dedicated asyncssh process session with stdin sealed by construction (no
+  code path can write to the partition console), enforces client-side
+  duration/max-bytes/idle bounds, returns raw bytes (truncation never splits a
+  multi-byte UTF-8 or incomplete ANSI escape sequence), detects vterm
+  contention by the recorded stdout sentinel (exit code is always 0), and
+  runs `rmvterm` on every exit path — with `released` true only after an
+  independent-session mkvterm probe proves the slot free. Designed from the
+  P1–P8 live-hardware prototype recorded on #385 (HMC V10R3 M1060); only idle
+  partition streams were observed live, so the ANSI truncation rule is
+  protocol-derived.
+- Facade exports for four operations ADR 0029's selection rule already covered but the manifest
+  omitted: `list_optical_mappings`, `mount_optical_media`, `unmount_optical_media` (shipped
+  unexported by #205) and `assess_post_activation_affinity` (shipped unexported by #318) (#363).
+  A contract test now applies the selection rule to every `operations_*` module by introspection
+  and replaces the hand-written module-to-names map that could not detect the omission, since the
+  same edit maintained both the map and `__all__`. **Consumer note:** ADR 0092 §3.2 records
+  `mount_optical_media` and `unmount_optical_media` as ownership-unguarded — they mutate a named
+  client partition without an ADR 0011 ownership check. Exporting them does not change that; #440
+  adds the guard, and doing so will add an `ownership_override` keyword to both signatures.
+- `set_lpar_processors` and `set_lpar_memory` operations and facade exports (#365, ADR
+  0013/0029/0092/0094): the DLPAR processor and memory workflows move out of the
+  `hmc_dlpar_proc` / `hmc_dlpar_mem` tool bodies into `operations_lpar`, so a consumer already
+  running an event loop can call them — the tool path reached them only through `asyncio.run`,
+  which raises inside a running loop. Tool names and existing parameters are unchanged.
+  **Both are now guarded.** ADR 0092 §3.2 classifies DLPAR resource changes as Reconfiguring,
+  which must be guarded unconditionally, so each calls `authorize_lpar_mutation` before the write
+  and each tool gains an appended `ownership_override: bool = False`. Two consumer-visible
+  consequences: a guarded call now needs SSH reachability to the HMC as well as REST, because the
+  ADR 0011 token is read over SSH (#459 makes that failure actionable); and a call that omits
+  `system_name_or_uuid` now discovers the owning managed system by a bounded fleet walk, because
+  the guard is keyed by CLI system name — supply the selector to skip it. ADR 0094 records the
+  derivation and its alternatives.
+- `install_vios_by_lpar_selector` and `install_vios` operations and facade exports (#366, ADR 0013/0029/0070):
+  the `installios` orchestration moves out of the `hmc_install_vios_by_lpar_selector` / `hmc_install_vios` tool
+  bodies into a new `operations_install` module, so a consumer already running an event loop can
+  call it — the tool path reached it only through `asyncio.run`. Both return the CLI bridge's
+  detach handle (resolved system and partition names, the remote PID, the install log path, and a
+  message restating them), not an HMC job identifier: there is no HMC job on this path (ADR 0069)
+  and nothing to poll. Tool names, parameter lists, and returned payloads are unchanged. Both are
+  classified in ADR 0092 §3.4a — outside §1's ownership rule by resource type, since `installios`
+  requires a Virtual I/O Server partition and ADR 0011 stamps no token on one.
+  **Consumer note:** both operations now preflight the resolved target and reject a non-Virtual
+  I/O Server or any state other than `not activated` before SSH submission. Submission is not
+  idempotent: a second concurrent call submits a second detached `installios` against the same
+  partition, and the install log path is keyed on the partition *name* alone — the managed system
+  is not part of it, and the redirect truncates — so two same-named partitions on different
+  managed systems behind one HMC share one log and destroy each other's only diagnostic record.
+  The returned `log_path` is not unique per system; serializing per partition name across every
+  managed system on the HMC is the caller's responsibility. A returned handle means the process
+  was backgrounded, not that the detached install later completed successfully. The preflight
+  raises `HMCError` for an unsafe type or state, adds no parameter, and therefore does not move
+  the frozen signature digest (#460).
+- `ownership-denied` audit record for a refused ADR 0011 ownership check (#467, ADR 0100).
+  The guard recorded approved overrides and nothing else, so an operator reading the stream
+  could not tell "nobody tried to mutate a partition they do not own" from "many attempts were
+  refused" — and on the CLI and Python API paths, which no access policy reaches, a refusal
+  left no trace at all. Both denial branches now emit one `WARNING` record naming the guard
+  entry point (`operation`: `lpar-mutation` or `lpar-decommission-snapshot`), the rule that
+  refused (`denial`: `foreign-owner` or `malformed-token`), the system, the partition, the
+  owner the LPAR's token claims (`null` on `malformed-token`), the HMC, and the acting agent.
+  `ownership-override` is untouched — same name, same fields, same level — so an
+  `event == "ownership-override"` filter keeps counting approved bypasses and nothing else.
+  `docs/authorization-audit.md` documents the record and the caveats on alerting from it.
+  No exported signature changes.
+- `hmc_effective_permissions` reports `power_ownership_guards` (#470): the effective,
+  post-precedence `authorize_power_operations` (ADR 0092 §4) for every connection the access
+  policy's grants name, resolved inside the running server rather than in the shell that
+  asks. The guard fails **open** and `HMCConfig` sets `extra="ignore"`, so a mistyped profile
+  key or environment variable is dropped silently and is otherwise indistinguishable from a
+  correct `false`; each entry carries the `source` that supplied the value — `environment`,
+  `profile`, or `default`, where `default` is the answer that means nothing the operator
+  wrote arrived. Environment names are matched case-insensitively, so exact and variant
+  spellings both report `environment` and override the profile consistently (#547, ADR 0110).
+  `hmcpctl config show` could not answer
+  either deployment the documentation
+  recommends: it exits 1 with no `config.toml`, and it reads the invoking shell's environment
+  rather than the served process's. The entry keeps the setting's own name and polarity —
+  `authorize_power_operations: true` means the ownership guard is enforced — because
+  `authorized: false` would read as "not authorized" for the permissive state, which is the
+  misreading this change exists to end. With `HMC_HOST` set the report carries at most the
+  `<default>` row, because every connection token collapses there at dispatch. A connection
+  whose config cannot be built reports
+  `authorize_power_operations: null` with `source: unresolved` and a closed `detail` — the
+  exception class,
+  plus the rejected field names for a `ValidationError`. The underlying message is withheld
+  from the caller and logged instead: `ConfigError` names every `profiles` and `nicknames`
+  key in `config.toml`, which is the connection inventory ADR 0038 refuses to disclose, and
+  a `ValidationError` quotes the value it rejected. Beyond the connection names the policy
+  already declares, the entries carry no host, user, or credential; ADR 0037's disclosure
+  bullet is amended to record the narrowed claim. `describe()` takes the resolved guards as
+  a fourth argument and stays a pure function of its arguments; `EffectivePermissions` is not
+  a `hmcpctl.api` export, so the facade manifest is unaffected.
+- `install-attempted` audit record for a detached `installios` submission (#469, ADR 0102).
+  `install_vios_by_lpar_selector` and `install_vios` submit an irreversible install against a partition's
+  disks and detach; the path has no HMC job, no ADR 0011 ownership guard, and — for an
+  `hmcpctl.api` consumer — no dispatch-boundary `authorization` record. The two `INFO` lines
+  it left instead went to the unconfigured `hmcpctl.operations_install` logger, whose
+  effective level is the root's `WARNING`, so they were dropped before formatting. That left a
+  bare `hmcpctl.api` consumer with no local trace at all, and a served deployment with only
+  the `authorization` permit for the tool call — which names the tool but never the resolved
+  system, partition, or log path, and which `--audit-level WARNING` drops. One `WARNING`
+  record now goes to the
+  reserved `hmcpctl.audit` logger immediately **before** the submit — the ambiguous case,
+  since the raised exception cannot say whether anything was submitted — carrying the resolved
+  system and partition, the HMC-side `log_path`, the HMC, and the acting agent. The
+  post-submit "Detached" line stays on the module logger; the PID it adds is already in the
+  returned `InstallHandle`. No exported signature changes.
 
 ### Changed
+
+- `hmc_modify_user` without a replacement password sends the empty `UserProfilePassword`
+  element as GET serves it. V10R3 accepted the writes in the #1409 probe. Its users-arm
+  observation remains failed: an empty description resets to `HMC User`, which the arm
+  had expected to read as empty. The arm now checks that exact observed default;
+  consolidated live verification of the corrected harness remains pending (ADR 0202).
+- Bind `lpar.modify` delegated assignment rows and extend ST39 with an optional
+  scratch-only dedicated-slot proof, guarded restoration and explicit read failures.
+- The live harness gained an opt-in `lpar-power` arm (`scripts/live_lpar_power.py`, subtask
+  41). It creates `hmcpctl-live-pwr-<8 hex>` partitions and verifies `hmc_create_lpar`'s
+  refusals, `hmc_power_on_lpar` (profile and current-configuration activation, and a
+  running partition reported without a job), `hmc_power_off_lpar` (delayed and immediate),
+  `hmc_power_lpar`, `hmc_capture_lpar_console` and `hmc_delete_lpar` (refused while
+  activated), then `hmc_provision_lpar` on a run-owned 1 GiB VIOS volume and
+  `hmc_decommission_lpar`; preflight names it and `scripts/live_test_recovery.py` reports any
+  `hmcpctl-live-pwr-` partition, `lppwr` volume mapping or adapter serving one (#1346). The
+  bare-cec arm now records its create, PowerOn, console, PowerOff and delete steps as rows,
+  so each of those operations has one observing arm. The power and lifecycle operations'
+  capability rows now name the requests the code issues, and `lpar.power`,
+  `lpar.decommission`, `provision.lpar`, `system.power_on` and `system.power_off` carry
+  maturity records. `lpar.dump_restart`, provision's SR-IOV and vNIC arguments, a graceful
+  `hmc_power_lpar` stop and whole-system power stay unverified, each recorded with what it
+  needs. Live on V10R3 six of the arm's eight observations passed. `lpar.power_on`
+  failed because the HMC refuses the `OperationType` PowerOn parameter
+  (`INVALID_PARAMETER`; the request without it activates), and `provision.lpar` failed
+  because a dedicated slot it assigns lands in the profile while its PowerOn activates the
+  current configuration, so the running partition lacks the slot.
+- The live harness gained an opt-in `lpar-config` arm (`scripts/live_lpar_config.py`, subtask
+  39). It creates one `hmcpctl-live-lpar-<8 hex>` partition, verifies `hmc_modify_lpar`,
+  `hmc_rename_lpar`, `hmc_dlpar_mem`, `hmc_dlpar_proc`, `hmc_set_lpar_boot_order` and the
+  `hmc_clear_lpar_boot_order` refusal against it, activates it to SMS for the activated DLPAR
+  case, and deletes it; preflight names it and `scripts/live_test_recovery.py` reports any
+  `hmcpctl-live-lpar-` partition left behind (#1345). Live on V10R3 all six observations
+  passed. ST8 no longer declares an expected HTTP 406 for `hmc_modify_lpar`: the
+  read-modify-write path is accepted, so a 406 there is now a failure, not a gap. DLPAR on a
+  partition activated to SMS was refused (`HSCL7016`, the partition must be running), so DLPAR
+  on a running operating system stays unverified; the `hmc_modify_lpar` observation covers its
+  resource path, not its PCIe assignments. Memory above the maximum is refused with
+  `REST0264`.
+- `hmc_create_user` and `hmc_modify_user` take `associated_task_role` as a task-role name
+  (`TaskRoleName` from `hmc_list_task_roles`) and `associated_resource_roles` as resource-role
+  names, not hrefs. The `UserProfile` document now writes them as the documented
+  `AssociatedTaskRole` and `AssociatedResourceRole` text elements, in the documented element
+  order, with `AuthenticationType` in the lower case the HMC lists (a V10R3 create carrying
+  `Local` was refused with `REST0001`); an href passed as before is sent as a name (ADR 0202,
+  #632). The builder is in every
+  handler's import closure, so every previously current live observation now reads `stale`
+  (`closure-changed`, ADR 0127) until its arm re-runs.
+- The live harness's user lifecycle moved from round2 to its own opt-in `users` arm
+  (`scripts/live_users.py`, subtask 11). It creates one `hmcpctl-live-<8 hex>` viewer user with
+  remote access disabled and deletes it by UUID in the same run; preflight names it, and
+  `scripts/live_test_recovery.py` reports any `hmcpctl-live-` user left behind.
+  `LIVE_TEST_TEST_USER_NAME` is retired: a `.env` that still sets it loads with a notice, and the
+  line can be deleted (#632). Live on V10R3 the HMC refused `hmc_create_user` (REST0001: a `kb`
+  marking must be `COR`), so creation, and the get, modify and delete that follow it, remain
+  unverified; the user, role and remote-access reads are verified.
+- `HMCClient` no longer raises a logoff transport failure (`HMCTransportError`) when its
+  `async with` body completed: it logs a warning naming the HMC host and noting that the HMC
+  session may persist until the HMC times it out, so a completed tool call is no longer reported
+  as failed. An HMC rejection of the logoff (`HMCError`) still raises, and a body that raised
+  still carries every cleanup failure as a note (ADR 0028 amendment, #1325).
+- `hmc_power_off_lpar`, `hmcpctl lpars power-off`, `power_lpar`, `submit_power_off` and
+  `jobs.power_off_lpar_job` refuse `operation=shutdown` with `restart=true` and
+  `immediate=false` before any job is built. On the HMC that combination is a dump restart,
+  which crashes the partition, and it previously needed no `allow_dump_restart` grant. Pass
+  `immediate=true` (CLI: `--immediate`) for an immediate restart, use `operation=osshutdown`
+  for an operating-system restart, or use `hmc_dump_restart_lpar` for the dump. The tool's
+  docstring no longer calls `immediate=false` graceful: it is a delayed shutdown
+  (ADR 0164 amendment, #1314).
+- `hmc_upload_iso` and `hmcpctl storage upload-iso` return the download digest as
+  `source_sha256` instead of `sha256`, with no alias. It is computed from the bytes fetched from
+  the source URL, not read back from the VIOS; `media` is documented as the HMC repository entry,
+  whose `MountType` can differ from VIOS `lsrep` (#1281).
+- `hmc_list_lpars`, `hmc_list_vios` and `hmc_list_lpar_ownership` return `entries` and
+  `unreadable_systems` instead of a bare list, as do `hmcpctl lpars list --json` and
+  `hmcpctl vios list --json` and the `list_lpars`, `list_vios` and `list_lpar_ownership`
+  operations. Without a system they no longer read the HMC-wide partition or VIOS feeds,
+  which timed out on an HMC with one system in `No Connection`. They read each operating
+  managed system's own feed and name every other system in `unreadable_systems`; the CLI also
+  prints one `Skipped managed system` line per skipped system on stderr. A VIOS state filter is
+  now always applied locally (ADR 0197, #1293).
 
 - **Access-policy contract:** a grant naming `hmc_power_off_lpar` no longer reaches the
   `dumprestart` crash; add `hmc_dump_restart_lpar` to the grant to keep it. An
@@ -1482,217 +840,6 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
 - Storage inventory operations now return bounded `VolumeGroup`, `OpticalMedia`,
   and `StorageMapping` values instead of raw HMC response mappings (ADR 0117).
 
-### Added
-
-- `docs/capabilities/maturity.json` carries its first live observation, from the
-  harness shake-down run against V10R3 / POWER10 hardware: `console.info`, result
-  `failed`, on an HMC firmware defect serializing a null `Session/SessionId` property.
-  The row derives as `stale (closure-changed)` rather than `failed` on current `main`,
-  because the operation's import closure moved after the observation was taken — the
-  staleness rule working as designed, not a recording error (#708).
-
-- `python -m hmcpctl` now runs the CLI, as an alias for the `hmcpctl` console script wherever
-  the `app` extra is installed — like the console script, it needs that extra and fails the
-  same way without it. It delegates to the same entry point and takes no arguments of its own,
-  so the two remain one program; the program name Typer reports differs. One difference does
-  matter operationally: `-m` places the current working directory first on `sys.path`, where
-  the console script does not, so prefer `hmcpctl` for a served process and use
-  `python -P -m hmcpctl` (or `PYTHONSAFEPATH=1`) when launching from a directory you do not
-  control. The live audit proof uses it because the generated console script cannot be relied
-  on to exec with stderr closed once the interpreter path is long enough that `uv` emits a
-  `/bin/sh` trampoline (#709, ADR 0128).
-- A warning-level `install-submitted` audit event now carries the remote PID returned by a
-  detached `installios` submission to served operators (#544, ADR 0109).
-- Serve startup now submits a warning-level `power-ownership-guard` audit record for every
-  policy-reachable connection, preserving the effective guard value when the permissions
-  inspection tool is withheld (#533, ADR 0107).
-- Seven bounded SSH-backed VIOS label tools list, set, and remove individual FC-port
-  labels and list, create, update, and remove individual vFC group labels using the
-  POWER10 and POWER11 `lslabelvios`/`labelvios` grammar. They do not expose MSP,
-  vNIC, vSCSI, override-default, bulk-removal, or adapter-mutation behavior. Issue
-  #559 tracks live-system field and mutation evidence not established by the manuals.
-  The matching `hmcpctl vios` commands are `list-fc-port-labels`,
-  `set-fc-port-label`, `remove-fc-port-label`, `list-vfc-group-labels`,
-  `create-vfc-group-label`, `update-vfc-group-label`, and `remove-vfc-group-label`.
-- `ManagedSystemPatch` and `LpmMigrationRequest` provide reusable typed request
-  values for managed-system configuration and LPM destination inputs.
-- `VirtualNetworkResult` exposes the resolved managed-system UUID beside the
-  resource returned by `create_virtual_network`.
-- `DecommissionBlastRadius` and `DecommissionAdapterRecord` expose the fixed
-  `DecommissionResult.blast_radius` inventory schema to reusable Python callers.
-- `StorageMapResult` records the authorized LPAR UUID beside the resource returned by
-  `map_storage`, so library and CLI callers no longer resolve the partition independently
-  before the guarded storage operation (ADR 0104).
-- `VolumeGroup`, `OpticalMedia`, and `StorageMapping` provide stable storage
-  inventory values for reusable Python callers (ADR 0117).
-- Opt-in ADR 0011 ownership guard on LPAR power operations (#371, ADR 0092 §4): the new
-  `authorize_power_operations` setting (`HMC_AUTHORIZE_POWER_OPERATIONS`, TOML profile key
-  `authorize_power_operations`) defaults to `false`, leaving the `power_lpar` call path
-  unchanged and opening no SSH connection. When `true`, `power_lpar` reads the ownership
-  token before submitting the job and refuses a partition another agent owns; it accepts a
-  new `ownership_override` parameter with the same audited semantics as its guarded
-  siblings. `system_name_or_uuid` stays optional (ADR 0063): the guard routes through
-  ADR 0094's shared resolve chain, which derives the owning managed system by bounded
-  parent discovery when the caller omits it and confirms the partition lives on the
-  named system when they supply it. `hmc_power_on_lpar`, `hmc_power_off_lpar`, and
-  `hmcpctl lpars power-on` / `power-off` gained the matching `ownership_override`
-  argument, and the two CLI commands gained `--system`, which replaces the fleet walk
-  with one read. `provision_lpar` passes the override on its own activation leg, which
-  targets the partition that workflow just created and stamped. Both new parameters move
-  the frozen public signature digest.
-- `HMCConfig.from_mapping(values)`: environment-isolated construction for library
-  consumers (#368, ADR 0096). `HMCConfig` is a pydantic-settings model with
-  `env_prefix="HMC_"`, so the ordinary constructor resolves every field a caller leaves
-  unset from the ambient process environment — right for the CLI and the MCP server,
-  wrong for a process building one config per HMC from database rows, where a stray
-  `HMC_HOST` silently retargets a backend, a stray `HMC_SSH_KEY_FILE` offers the wrong
-  key, and a stray `HMC_AGENT_ID` corrupts ADR 0011 ownership attribution.
-  `from_mapping` reads no environment variable and no dotenv file; every field the
-  mapping omits takes its declared default. `load_profile` is unchanged —
-  environment-over-TOML precedence on the operator path is deliberate. **Note:**
-  `_env_file=None` is *not* an isolation mechanism — it suppresses a dotenv source, never
-  the environment, and `HMCConfig` configures no dotenv source at all, so it does nothing.
-  `docs/environment-variables.md` gains a "Library Consumers" section covering precedence
-  and the isolation pattern.
-- Cross-process job polling: the `get_job` and `wait_for_job` operations in the new
-  `hmcpctl.operations_jobs` module, plus the `JobOutcome` facade export (#364, ADR 0093). The
-  supported handle for a job is two persistable strings — `job_id` and an optional `job_href` —
-  so a consumer can store them, restart, construct a fresh `HMCClient`, and poll from a different
-  process than the one that submitted the work. A job the HMC no longer knows about (reaped,
-  deleted, or never present) now returns `found=False` instead of an opaque HTTP 404 `HMCError`,
-  which is what lets a restarted worker tell "still running" from "gone". `JobOutcome` gained the
-  `found: bool` and `job_href: str | None` fields. Neither has a default — that keeps both in the
-  `required` set of the MCP output schema the wait tools share — so any direct construction of
-  `JobOutcome` from the previous five fields must now supply them. Its field set is a package-owned
-  model contract under ADR 0029, except `job`, which stays an opaque HMC resource mapping. The
-  handle and `found` semantics above describe outcomes returned by `get_job` and `wait_for_job`;
-  the submitting operations share the type but report a submission, so their `job_id` may be a
-  synthetic label and their `found=False` means "this submission returned no job entry"
-  (ADR 0093 clause 3).
-- `set_lpar_ownership_description` operation and facade export (#376, ADR 0066).
-- Strict LPAR ownership stamping (#377, ADR 0067): `provision_lpar` accepts a new
-  `stamp_policy` field on `LparCreation` with literal alternatives `"best-effort"` (default) and
-  `"required"`.
-- Audit sink emits a `tls-verification-disabled` event when TLS verification is off, as
-  controlled by `HMC_VERIFY_SSL` (#379).
-- `list_lpar_ownership` operation, facade export, and `hmc_list_lpar_ownership` MCP tool
-  (#375, ADR 0071): parsed ADR 0011 ownership per LPAR from the REST bulk list feed — one
-  call covers every partition on a managed system. Partitions with no description
-  (REST `<Description>` element absent), a non-token description (`unparsed`), and a valid
-  ownership stamp (`owned`/`owner`) are reported as distinct facts; none are dropped.
-- Bounded, non-interactive LPAR console capture: `capture_lpar_console`
-  operation, `ConsoleCapture` / `ConsoleHeldError` facade exports, and the
-  `hmc_capture_lpar_console` MCP tool (#385, ADR 0072). Runs `mkvterm` over a
-  dedicated asyncssh process session with stdin sealed by construction (no
-  code path can write to the partition console), enforces client-side
-  duration/max-bytes/idle bounds, returns raw bytes (truncation never splits a
-  multi-byte UTF-8 or incomplete ANSI escape sequence), detects vterm
-  contention by the recorded stdout sentinel (exit code is always 0), and
-  runs `rmvterm` on every exit path — with `released` true only after an
-  independent-session mkvterm probe proves the slot free. Designed from the
-  P1–P8 live-hardware prototype recorded on #385 (HMC V10R3 M1060); only idle
-  partition streams were observed live, so the ANSI truncation rule is
-  protocol-derived.
-- Facade exports for four operations ADR 0029's selection rule already covered but the manifest
-  omitted: `list_optical_mappings`, `mount_optical_media`, `unmount_optical_media` (shipped
-  unexported by #205) and `assess_post_activation_affinity` (shipped unexported by #318) (#363).
-  A contract test now applies the selection rule to every `operations_*` module by introspection
-  and replaces the hand-written module-to-names map that could not detect the omission, since the
-  same edit maintained both the map and `__all__`. **Consumer note:** ADR 0092 §3.2 records
-  `mount_optical_media` and `unmount_optical_media` as ownership-unguarded — they mutate a named
-  client partition without an ADR 0011 ownership check. Exporting them does not change that; #440
-  adds the guard, and doing so will add an `ownership_override` keyword to both signatures.
-- `set_lpar_processors` and `set_lpar_memory` operations and facade exports (#365, ADR
-  0013/0029/0092/0094): the DLPAR processor and memory workflows move out of the
-  `hmc_dlpar_proc` / `hmc_dlpar_mem` tool bodies into `operations_lpar`, so a consumer already
-  running an event loop can call them — the tool path reached them only through `asyncio.run`,
-  which raises inside a running loop. Tool names and existing parameters are unchanged.
-  **Both are now guarded.** ADR 0092 §3.2 classifies DLPAR resource changes as Reconfiguring,
-  which must be guarded unconditionally, so each calls `authorize_lpar_mutation` before the write
-  and each tool gains an appended `ownership_override: bool = False`. Two consumer-visible
-  consequences: a guarded call now needs SSH reachability to the HMC as well as REST, because the
-  ADR 0011 token is read over SSH (#459 makes that failure actionable); and a call that omits
-  `system_name_or_uuid` now discovers the owning managed system by a bounded fleet walk, because
-  the guard is keyed by CLI system name — supply the selector to skip it. ADR 0094 records the
-  derivation and its alternatives.
-- `install_vios_by_lpar_selector` and `install_vios` operations and facade exports (#366, ADR 0013/0029/0070):
-  the `installios` orchestration moves out of the `hmc_install_vios_by_lpar_selector` / `hmc_install_vios` tool
-  bodies into a new `operations_install` module, so a consumer already running an event loop can
-  call it — the tool path reached it only through `asyncio.run`. Both return the CLI bridge's
-  detach handle (resolved system and partition names, the remote PID, the install log path, and a
-  message restating them), not an HMC job identifier: there is no HMC job on this path (ADR 0069)
-  and nothing to poll. Tool names, parameter lists, and returned payloads are unchanged. Both are
-  classified in ADR 0092 §3.4a — outside §1's ownership rule by resource type, since `installios`
-  requires a Virtual I/O Server partition and ADR 0011 stamps no token on one.
-  **Consumer note:** both operations now preflight the resolved target and reject a non-Virtual
-  I/O Server or any state other than `not activated` before SSH submission. Submission is not
-  idempotent: a second concurrent call submits a second detached `installios` against the same
-  partition, and the install log path is keyed on the partition *name* alone — the managed system
-  is not part of it, and the redirect truncates — so two same-named partitions on different
-  managed systems behind one HMC share one log and destroy each other's only diagnostic record.
-  The returned `log_path` is not unique per system; serializing per partition name across every
-  managed system on the HMC is the caller's responsibility. A returned handle means the process
-  was backgrounded, not that the detached install later completed successfully. The preflight
-  raises `HMCError` for an unsafe type or state, adds no parameter, and therefore does not move
-  the frozen signature digest (#460).
-- `ownership-denied` audit record for a refused ADR 0011 ownership check (#467, ADR 0100).
-  The guard recorded approved overrides and nothing else, so an operator reading the stream
-  could not tell "nobody tried to mutate a partition they do not own" from "many attempts were
-  refused" — and on the CLI and Python API paths, which no access policy reaches, a refusal
-  left no trace at all. Both denial branches now emit one `WARNING` record naming the guard
-  entry point (`operation`: `lpar-mutation` or `lpar-decommission-snapshot`), the rule that
-  refused (`denial`: `foreign-owner` or `malformed-token`), the system, the partition, the
-  owner the LPAR's token claims (`null` on `malformed-token`), the HMC, and the acting agent.
-  `ownership-override` is untouched — same name, same fields, same level — so an
-  `event == "ownership-override"` filter keeps counting approved bypasses and nothing else.
-  `docs/authorization-audit.md` documents the record and the caveats on alerting from it.
-  No exported signature changes.
-- `hmc_effective_permissions` reports `power_ownership_guards` (#470): the effective,
-  post-precedence `authorize_power_operations` (ADR 0092 §4) for every connection the access
-  policy's grants name, resolved inside the running server rather than in the shell that
-  asks. The guard fails **open** and `HMCConfig` sets `extra="ignore"`, so a mistyped profile
-  key or environment variable is dropped silently and is otherwise indistinguishable from a
-  correct `false`; each entry carries the `source` that supplied the value — `environment`,
-  `profile`, or `default`, where `default` is the answer that means nothing the operator
-  wrote arrived. Environment names are matched case-insensitively, so exact and variant
-  spellings both report `environment` and override the profile consistently (#547, ADR 0110).
-  `hmcpctl config show` could not answer
-  either deployment the documentation
-  recommends: it exits 1 with no `config.toml`, and it reads the invoking shell's environment
-  rather than the served process's. The entry keeps the setting's own name and polarity —
-  `authorize_power_operations: true` means the ownership guard is enforced — because
-  `authorized: false` would read as "not authorized" for the permissive state, which is the
-  misreading this change exists to end. With `HMC_HOST` set the report carries at most the
-  `<default>` row, because every connection token collapses there at dispatch. A connection
-  whose config cannot be built reports
-  `authorize_power_operations: null` with `source: unresolved` and a closed `detail` — the
-  exception class,
-  plus the rejected field names for a `ValidationError`. The underlying message is withheld
-  from the caller and logged instead: `ConfigError` names every `profiles` and `nicknames`
-  key in `config.toml`, which is the connection inventory ADR 0038 refuses to disclose, and
-  a `ValidationError` quotes the value it rejected. Beyond the connection names the policy
-  already declares, the entries carry no host, user, or credential; ADR 0037's disclosure
-  bullet is amended to record the narrowed claim. `describe()` takes the resolved guards as
-  a fourth argument and stays a pure function of its arguments; `EffectivePermissions` is not
-  a `hmcpctl.api` export, so the facade manifest is unaffected.
-- `install-attempted` audit record for a detached `installios` submission (#469, ADR 0102).
-  `install_vios_by_lpar_selector` and `install_vios` submit an irreversible install against a partition's
-  disks and detach; the path has no HMC job, no ADR 0011 ownership guard, and — for an
-  `hmcpctl.api` consumer — no dispatch-boundary `authorization` record. The two `INFO` lines
-  it left instead went to the unconfigured `hmcpctl.operations_install` logger, whose
-  effective level is the root's `WARNING`, so they were dropped before formatting. That left a
-  bare `hmcpctl.api` consumer with no local trace at all, and a served deployment with only
-  the `authorization` permit for the tool call — which names the tool but never the resolved
-  system, partition, or log path, and which `--audit-level WARNING` drops. One `WARNING`
-  record now goes to the
-  reserved `hmcpctl.audit` logger immediately **before** the submit — the ambiguous case,
-  since the raised exception cannot say whether anything was submitted — carrying the resolved
-  system and partition, the HMC-side `log_path`, the HMC, and the acting agent. The
-  post-submit "Detached" line stays on the module logger; the PID it adds is already in the
-  returned `InstallHandle`. No exported signature changes.
-
-### Changed
-
 - `create_user` and `modify_user` now expose the documented user-profile fields as
   explicit typed keyword parameters instead of accepting an untyped `**fields` bag.
 - User deletion and remote-access MCP tools now call the client boundary directly;
@@ -1850,6 +997,19 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
 
 ### Removed
 
+- `hmc_install_vios_by_lpar_selector` (operation `lpar.install_os`) and the
+  `install_vios_by_lpar_selector` operation are retired (#1371, ADR 0203). The selector
+  resolved its target only through the `LogicalPartition` feed and then required a Virtual I/O
+  Server, which is listed only in the `VirtualIOServer` feed, so it could never submit an
+  install. Install a VIOS with `hmc_install_vios` (`install_vios`): it takes the same arguments,
+  with `vios_name_or_uuid` and `vios_ip` in place of `lpar_name_or_uuid` and `lpar_ip`. The
+  `lpar.install_os` capability and maturity rows are gone; `cli:commands/installios` stays bound
+  by `vios.install`. The server exposes 162 tools by default.
+- `hmcpctl.documents.build_media_repository_delete_document` and
+  `build_virtual_optical_media_delete_document` are removed. No request path called them:
+  `hmc_delete_media_repository` and `hmc_delete_optical_media` remove the node by VolumeGroup
+  read-modify-write (#1415).
+
 - `hmc_list_recent_jobs` and `hmcpctl jobs list`. Both read `GET /rest/api/uom/Job`, which
   the HMC REST reference does not document (it documents only `GET`/`DELETE
   /rest/api/uom/jobs/{job_id}`), and which every captured HMC refused with
@@ -1921,333 +1081,12 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
 
 ### Facade manifest
 
-- Changed: `hmcpctl.api` now exports only `HMCClient`, `HMCConfig`,
-  `ConfigError`, `HMCError`, `HMCTransportError`, and
-  `TLSVerificationDisabledWarning`; every operation and operation-specific
-  model previously exported by the facade is removed (ADR 0118).
-- Added: named LPM affinity literal types (`LpmCapability`, `LpmDestinationCheckBasis`,
-  `LpmPreflightStatus`, and `LpmResponse`) for typed reusable callers.
-- Added: `RemoteRestartRequest` groups remote-restart-specific controls while common
-  polling controls remain keyword-only.
-- Added: `ProvisionRequest` groups the typed inputs for end-to-end LPAR provisioning;
-  the operation now accepts this request object directly.
-- Changed: VIOS backup, restore, and backup-catalog operations now take the VIOS selector
-  first and accept managed-system scope as a keyword-only argument.
-- Renamed: `list_available_hmc_ptfs` to `submit_available_hmc_ptfs_query`.
-- Renamed: `metric_data` to `fetch_metric_data` and `capacity_report` to
-  `fetch_capacity_report` in the reusable facade.
-- Changed: removed the stale `ambiguous` literal alternative from
-  `PowerOwnershipGuard.source`; exact and case-variant environment spellings now report
-  `environment` in both the MCP response and startup audit schema. No `hmcpctl.api.__all__`
-  export changed.
-- No facade export changes for `install-submitted`; the event vocabulary is an internal
-  audit-stream contract and `InstallHandle` is unchanged.
-- Added: `TLSVerificationDisabledWarning` lets reusable Python consumers filter
-  the TLS-disabled logon warning without suppressing unrelated `UserWarning`s.
-- Added: `ManagedSystemPatch` and `LpmMigrationRequest` replace recurring scalar
-  option groups in `modify_system`, `validate_lpar_migration`, `migrate_lpar`,
-  and `migrate_lpar_with_affinity_preflight`.
-- Added: `VirtualNetworkResult` records the resolved managed-system UUID beside
-  the HMC resource returned by `create_virtual_network`.
-- Changed: `delete_adapter` returns the deleted adapter UUID instead of its
-  parent LPAR UUID.
-- Changed: SSH-only PCIe, vNIC inventory, and affinity read operations now
-  accept `HMCConfig` directly instead of constructing an unused REST client.
-- Changed: `ProvisionNetwork` is replaced by `ProvisionAdapters`, reflecting that
-  the model configures both virtual Ethernet and the VIOS-side vSCSI adapter.
-- Changed: `create_virtual_disk` now names its mebibyte value `capacity_mib`,
-  matching the CLI and MCP tool boundary.
-- Changed: `list_systems` accepts any exact HMC state string; removed the
-  misleading finite `ManagedSystemState` facade type and tool-schema enum.
-- Renamed: `get_vios` is now `get_vios_storage_detail`.
-- Added: `DecommissionBlastRadius` and `DecommissionAdapterRecord` type the
-  stable inventory returned through `DecommissionResult.blast_radius`.
-- Added: `list_clusters`, `list_shared_storage_pools`, and
-  `get_shared_storage_pool` provide shared presentation-neutral cluster inventory
-  operations for CLI, MCP, and reusable Python callers.
-- Changed: PCIe and SR-IOV inventory operations now consistently name their
-  managed-system selector `system_name_or_uuid`.
-- Changed: `read_lpar_boot_order`, `set_lpar_boot_order`, and
-  `clear_lpar_boot_order` now accept a system-scoped LPAR name or UUID.
-- Changed: SSH affinity result types and workflows now live in
-  `operations.affinity.ssh`; network inventory and vNIC mutation now live in
-  `operations.virtualization.vnic`.
-- Changed: `delete_vios`, `update_vios`, and `upgrade_vios` now place the
-  optional managed-system selector before the VIOS selector, matching sibling VIOS
-  operations and allowing update and upgrade names to be disambiguated.
+`hmcpctl.api.__all__` is exactly six names: `ConfigError`, `HMCClient`, `HMCConfig`,
+`HMCError`, `HMCTransportError`, and `TLSVerificationDisabledWarning`
+(`tests/unit/test_public_api.py`). This is the first manifest a release ships. Earlier drafts
+of this changelog recorded a 127-name `hmc_mcp.api` manifest and its deltas; no release shipped
+them, and the operations they named are now pre-release domain-module APIs
+([Python library](docs/python-api.md)).
 
-- Added: `get_vios_storage_detail`, `list_vios`, and the latter's `PartitionState` selector
-  type as the shared VIOS inventory boundary used by both presentation layers.
-- Changed: `power_system` and `power_vios` now name their action flag
-  `power_on`, matching `power_lpar`.
-- Added: `get_system`, `list_systems`, and their `ManagedSystemState` selector type as
-  the shared managed-system read boundary used by both presentation layers.
-- Added: `CreateUserRequest` and `ModifyUserPatch`; `create_user` and `modify_user`
-  now accept these typed profile payloads instead of duplicated wide parameter lists.
-- Changed: SSH-backed network and affinity operations now consistently name their
-  selectors `system_name_or_uuid` and `lpar_name_or_uuid`.
-- Added: `resolve_and_authorize_lpar_mutation` and `resolve_and_authorize_lpar_names` after
-  ownership authorization moved to the cross-cutting `operations.lpar.ownership` module.
-- Added: `StorageMapResult`; `map_storage` now returns this concrete result instead of the
-  mapped resource alone.
-- Added: `VolumeGroup`, `OpticalMedia`, and `StorageMapping` replace raw HMC storage
-  inventory mappings at the supported operation boundary (ADR 0117).
-- Added: `upgrade_vios`, splitting VIOS upgrades from `update_vios`; `update_vios` now accepts
-  only `VIOSUpdateSource` and has no `kind` mode selector.
-- Removed: `add_vios_adapter`; use the explicit `add_vscsi_adapter` or `add_vfc_adapter`
-  operation instead.
-- Added: `add_vscsi_adapter` and `add_vfc_adapter`, replacing the boolean mode selector on
-  `add_vios_adapter` with operation-specific names.
-- Changed: `add_network_adapter`, `add_vios_adapter`, `delete_adapter`,
-  `map_storage`, `attach_disk_to_lpar`, `mount_optical_media`,
-  `unmount_optical_media`, `migrate_lpar`, `migrate_lpar_with_affinity_preflight`,
-  `abort_lpar_migration`, `recover_lpar_migration`, and `remote_restart_lpar` now
-  accept `ownership_override` and enforce the shared LPAR ownership guard before
-  their first mutating submission. These changes move the frozen public signature
-  digest.
-- Added: `configure_lpar_msp`, `configure_lpar_processor_compatibility`, and
-  `synchronize_lpar_profile`, together with their `ProcessorCompatibilityMode` input
-  type; the guarded SSH-backed configuration operations now have supported reusable
-  import paths.
-- Changed: `detach_storage_mapping` now accepts a managed-system selector and
-  `ownership_override`, resolves the mapping's client LPAR, and authorizes it before
-  detachment. This moves the frozen public signature digest.
-- Added: `create_lpar`, the complete reusable creation workflow that validates PCIe requests,
-  creates and ownership-stamps the partition, applies assignments, and returns the existing
-  `LparPcieWorkflowResult`. `modify_lpar` now also accepts an optional ordered `new_name` step;
-  both changes move the frozen public signature digest.
-- Changed: `modify_lpar` now orders its selectors as managed system then LPAR, matching the
-  reusable LPAR operation contract. This moves the frozen public signature digest.
-- Changed: `unassign_sriov_logical_port` now shares the assignment operation's positional
-  identity prefix and accepts `profile_name` as a keyword-only control. This moves the frozen
-  public signature digest.
-- Added: `modify_lpar`, `modify_system`, `create_vios`,
-  and `delete_vios`. These established cross-module operation seams are now named public
-  package entry points instead of being imported as private helpers. Their transitive input
-  types `MemoryMirroringMode`, `PowerOffPolicy`, and `PowerOnLparStartPolicy` are exported too;
-  all eight names join the frozen public signature digest.
-- Removed: `apply_validated_lpar_pcie_assignments`; reusable callers use
-  `apply_lpar_pcie_assignments`, which enforces prevalidation before mutation.
-- Added: `backup_vios`, `list_vios_backups`, and `restore_vios`, together with their
-  `BackupType` and `RestoreBackupType` input types. The reusable operations now own VIOS backup
-  validation, catalog parsing, selector resolution, and concrete HMC CLI command construction.
-  All three operations now accept the facade's shared `HMCClient` and read its configuration at
-  the SSH boundary; this moves the frozen public signature digest.
-- Added: the presentation-neutral update operations `list_available_hmc_ptfs`,
-  `update_console_software`, `update_firmware`, and `update_vios`, together with
-  `ConsoleUpdateMediaType`, `ConsoleUpdateSource`, `IOAdapterUpdateModel`,
-  `PlatformUpdateParameter`, `SriovAdapterUpdate`, `SystemFirmwareUpdateModel`,
-  `VIOSPlatformUpdate`, `VIOSUpdateHMCSource`, `VIOSUpdateIBMWebsiteSource`,
-  `VIOSUpdateNFSSource`, `VIOSUpdateSFTPSource`, `VIOSUpdateUSBSource`,
-  `VIOSUpgradeHMCSource`, `VIOSUpgradeNFSSource`, `VIOSUpgradeSFTPSource`, and
-  `VIOSUpgradeUSBSource`. MCP handlers now only manage the configured client boundary and
-  delegate the complete workflow.
-- Added: `configure_remote_access`, `create_user`, `delete_user`, and `modify_user`, plus their
-  `AuthenticationType` input type. These presentation-neutral operations already back the user
-  MCP tools and now satisfy ADR 0029's selection rule.
-- Changed: `install_vios` now places `system_name_or_uuid` before `vios_name_or_uuid`,
-  matching `install_vios_by_lpar_selector` and the other system-scoped partition operations. This moves the
-  frozen public signature digest.
-- Changed: `capture_lpar_snapshot` now reads the SSH configuration from its `HMCClient`
-  instead of requiring callers to pass the same client's configuration separately. This removes
-  the redundant `config` parameter and moves the frozen public signature digest.
-- Changed: LPAR-targeting facade operations now consistently place the managed-system selector
-  before the partition selector. This reorders `install_vios_by_lpar_selector`, `power_lpar`,
-  `set_lpar_processors`, `set_lpar_memory`, and all four virtual-adapter operations; callers
-  that want fleet discovery pass `None` explicitly for the system selector. Operation-specific
-  controls remain after the two selectors and the frozen signature digest moves.
-- Changed: public job operations now expose `wait`, `timeout_seconds`, and `poll_interval` as
-  keyword-only controls with shared defaults of `false`, 300 seconds, and 5 seconds.
-  `create_logical_unit` also defaults its keyword-only `cloned_from` selector to `None`.
-  This aligns `create_logical_unit`, `delete_logical_unit`, and `deploy_partition_template`
-  with the existing LPAR, LPM, system, VIOS, and persisted-job operations and moves the frozen
-  signature digest.
-- Changed: the first parameter of all SSH-backed public operations now consistently accepts
-  `HMCClient` instead of `HMCConfig`: `capture_lpar_console`, the normalized PCIe inventory and
-  SR-IOV mode operations, the FC/SEA/vNIC inventory operations, and the LPAR, system, and
-  resource-group affinity read and planning operations. Implementations read `hmc.config` at
-  the SSH boundary, matching every other supported operation and moving the frozen signature
-  digest.
-- Added: `validate_lpar_migration`, the standalone LPM validation operation already used by the
-  MCP and CLI adapters. ADR 0029's selection rule requires it in the reusable facade.
-- Added: `HMCIdentity`, replacing the inconsistently capitalized `HmcIdentity` export. This is a
-  breaking public rename and moves the frozen signature digest; no compatibility alias remains.
-- Added: `InstallHandle` (#468), the `TypedDict` `install_vios_by_lpar_selector` and `install_vios` now return
-  in place of `dict[str, Any]`. Runtime behaviour and both MCP tool responses are unchanged — a
-  `TypedDict` is a plain `dict` — but the five keys `system`, `partition`, `pid`, `log_path`, and
-  `message` are now part of the frozen public signature digest, so renaming one is a manifest
-  change rather than a silent break, and a downstream type checker resolves each value instead of
-  `Any`. **Statically this narrows the return type, so a consumer that type-checks may go red on
-  an upgrade**: holding the handle in a `dict[str, Any]`, passing it where `dict[str, Any]` is
-  expected, or adding or deleting a key are all errors against a `TypedDict`. Annotate with
-  `InstallHandle`, or with `Mapping[str, object]` where the consumer only reads.
-- Added: `InstallRequest`, the shared source, network, and profile value object accepted by
-  `install_vios_by_lpar_selector` and `install_vios`.
-- Added: the exports below landed between the `[0.1.0]` entry's enumerated manifest and this
-  cycle with no manifest bullet of their own (#479). Each is an entry in `hmcpctl.api.__all__`,
-  so each contributes to the frozen public signature digest. This records the manifest catching
-  up, not new capability. Grouped by the change that added them:
-  - `get_lpar_memopt_score`, `list_lpar_memopt_scores` (#252): memory-optimization scores read
-    per LPAR over the SSH command surface.
-  - `get_system_memopt_score`, `plan_lpar_memopt_scores`, `plan_system_memopt_score`, and the
-    `MemoptLparSelector` model (#311): the same scores at managed-system scope, plus the
-    planning variants that project a score without applying anything.
-  - `MemoptResourceGroupSelector`, `ResourceGroupAffinityResult`,
-    `list_resource_group_memopt_scores`, `plan_resource_group_memopt_scores` (#312): the
-    resource-group scope of the same surface.
-  - `LparSnapshot`, `SnapshotInspection`, `SnapshotValidationError`, `capture_lpar_snapshot`,
-    `inspect_lpar_snapshot`, `validate_lpar_snapshot` (#314): portable LPAR snapshot capture,
-    plus the two operations that parse a captured snapshot document locally without reaching
-    the HMC. `LparSnapshot` is the model the #482 bullet below describes the fields of.
-  - `MinimumAffinityPolicy`, `MinimumAffinityPolicyResult`, `get_minimum_affinity_policy`,
-    `set_minimum_affinity_policy` (#315): read and write of the minimum affinity policy.
-  - `AffinityAssessmentInput`, `AffinityAssessmentResult`, `AffinityEvidence`,
-    `CapturedPolicyState`, `PolicyState`, `assess_snapshot_affinity` (#317): affinity
-    assessment over a captured snapshot and the evidence and policy-state models it reports.
-  - `ProvisionAffinityAssessment` (#318): the assessment `provision_lpar` reports from the
-    activation leg of the workflow.
-  - `PostActivationAffinityAssessment`: the typed result returned by
-    `assess_post_activation_affinity`.
-  - `CapacitySummary`, `LparSummary`, `SystemSummary`: typed results for the public
-    capacity and inventory-summary operations.
-  - `LpmAffinityMigrationResult`, `LpmAffinityPreflightOutcome`, `LpmAffinityPreflightRequest`,
-    `migrate_lpar_with_affinity_preflight`, `run_lpm_affinity_preflight` (#320): the
-    affinity-aware LPM preflight and the migration that runs it first.
-- Added: `get_job`, `wait_for_job`, `JobOutcome` (#364, ADR 0093); this moves the frozen public
-  signature digest.
-- Added: `set_lpar_ownership_description`.
-- Added: `capture_lpar_console`, `ConsoleCapture`, `ConsoleHeldError` (#385,
-  ADR 0072); this moves the frozen public signature digest.
-- Added: `list_lpar_ownership`.
-- Added: `list_optical_mappings`, `mount_optical_media`, `unmount_optical_media`,
-  `assess_post_activation_affinity` (#363); this moves the frozen public signature digest. All four
-  were already selected by ADR 0029's rule and were absent from the manifest by omission, not by
-  decision, so this records the manifest catching up rather than a new capability.
-- Added: `set_lpar_processors`, `set_lpar_memory` (#365, ADR 0094); this moves the frozen public
-  signature digest. Both take `system_name_or_uuid` and `ownership_override` as keyword-only
-  parameters; the managed-system selector stays optional per ADR 0063, so a `hmcpctl.api` caller
-  may omit it and have the owning system derived.
-- Added: `install_vios_by_lpar_selector`, `install_vios` (#366); this moves the frozen public signature digest.
-  Their `dict[str, Any]` return is **not** one of ADR 0029's opaque HMC resource payloads — the
-  package composes all five keys itself, and no firmware level can add or remove one. The keys
-  `system`, `partition`, `pid`, `log_path` and `message` are pinned by a contract test
-  (`tests/unit/test_install_operations.py`). Changing one is a consumer-visible break even though
-  it moves neither the manifest nor the signature digest, so it needs the same minor release.
-  Typing the shape so the digest can see it is tracked by #468.
-- Added: `PcmResource` and `RemoteRestartOperation` (#446); this moves the frozen public
-  signature digest. `PcmResource` is the frozen dataclass `resolve_pcm_resource` returns;
-  `RemoteRestartOperation` is the literal alias `remote_restart_lpar` takes, whose alternatives
-  are `validate`, `recover`, `restart`, `cleanup`, and `cancel`. Both were already selected by
-  ADR 0029's type clause and absent from the manifest by omission, so a consumer met them
-  through a supported call with no supported import path to name them — visible to a downstream
-  type-checker since the PEP 561 marker shipped (#367). This records the manifest catching up,
-  not a new capability.
-- Added: nineteen types ADR 0029's type clause now reaches through the fields of an exported
-  model (#482); this moves the frozen public signature digest. Twelve `hmcpctl.snapshot` models
-  behind `LparSnapshot` — `HMCIdentity`, `LparIdentity`,
-  `MemoryProjection`, `NativeProfile`, `NormalizedConfiguration`, `ObservationEnvelope`,
-  `ProcessorProjection`, `SnapshotCapability`, `SnapshotConfiguration`, `SnapshotObservations`,
-  `SnapshotSource`, `SystemIdentity` — and seven literal aliases: `AffinityClassification`
-  (`regression`, `optimization-opportunity`, `policy-violation`, `unsupported-data`, `none`),
-  `CapabilityState` (`available`, `capability-unavailable`), `Keylock` (`normal`, `manual`,
-  `auto`), `OsType` (`aix`, `linux`, `ibmi`), `ResourceKind` (`dedicated_slot`, `sriov_adapter`,
-  `sriov_physical_port`, `sriov_logical_port`), `SharingMode` (`capped`, `uncapped`,
-  `keep_idle_procs`, `share_idle_procs`, `share_idle_procs_active`, `share_idle_procs_always`),
-  and `StopReason` (`duration`, `max_bytes`, `idle`, `remote-close`, `error`). ADR 0029's
-  Decision already called the fields of an exported model supported, while its walk stopped at
-  the types an operation *names*; a consumer therefore met `LparSnapshot.configuration` as
-  `hmcpctl.snapshot.SnapshotConfiguration` with no supported import path to name it. This
-  records the manifest catching up, not a new capability. No type moved modules and no value set
-  changed.
-- Fixed: `set_sriov_adapter_mode` appeared twice in `hmcpctl.api.__all__` (#446). The name is
-  imported once, so the duplicate was inert at runtime, but ADR 0029 calls `__all__` an
-  exhaustive manifest and a repeated entry makes it malformed. The export set is unchanged.
-- Removed: none.
-- Renamed: none.
-- Exported signature changes: `power_lpar` gained `ownership_override: bool = False`, and
-  `HMCConfig` gained the `authorize_power_operations: bool = False` field (#371, ADR 0092 §4).
-  A pydantic model's `__init__` signature is derived from its fields, so the setting moves the
-  frozen public signature digest even though no operation's parameters changed by it; the
-  `power_lpar` parameter moves it again. No export was added, removed, or renamed.
-- Exported model/literal changes: `HMCConfig` gained the `from_mapping(values)` classmethod
-  (#368, ADR 0096). ADR 0029 declares "the fields and constructor of an exported package-owned
-  model" supported, so a classmethod extends that model's supported surface and this is a minor
-  release under the `0.x` rule. On its own it does **not** move the frozen public signature
-  digest: that digest hashes each export's `inspect.signature`, which for a pydantic model is
-  the field-derived `__init__`, and a method changes no field. This change adds no
-  `api.__all__` entry — the digest move recorded above is `get_job` / `wait_for_job` /
-  `JobOutcome`'s (#364), not this one's.
-- Exported model/literal changes: `LparCreation` gained the
-  `stamp_policy: Literal["best-effort", "required"]` field (defaults to `"best-effort"`), which
-  moves the frozen public signature digest. The audit event vocabulary gained the
-  `"tls-verification-disabled"` literal on `hmcpctl.audit.Event`; that module is not part of the
-  `hmcpctl.api` facade, so it does not expand the manifest itself but is recorded here because it
-  widens a public literal vocabulary.
-- Exported model/literal changes: the audit event vocabulary gained the `"install-attempted"`
-  literal on `hmcpctl.audit.Event` (#469, ADR 0102). Recorded here on the same terms as
-  `"tls-verification-disabled"` above — `hmcpctl.audit` is not part of the `hmcpctl.api` facade,
-  so the manifest and the frozen public signature digest are unmoved, but the literal vocabulary
-  a consumer reading the audit stream matches against is wider.
-- Unchanged otherwise: #410 rebuilt `hmc_install_vios_by_lpar_selector` / `hmc_install_vios`
-  on the HMC CLI `installios` bridge (ADR 0070). These are MCP tools, not
-  `hmcpctl.api` exports; their parameter changes do not move the frozen
-  manifest or its signature digest — the operations behind them that #366 later
-  exported are separate names with their own signatures. #362 likewise removed the
-  `hmc_detach_optical_mapping` MCP tool and the `detach_optical_mapping`
-  operation; neither was exported from `hmcpctl.api`, so the manifest and the
-  frozen signature digest are unmoved and no minor release is gated on it.
-
-## [0.1.0] - 2026-08-22
-
-Initial supported Python API surface per ADR 0029: the reusable facade at `hmc_mcp.api`, its
-frozen export set (`tests/unit/test_public_api.py::test_public_api_manifest_is_frozen`) and its
-frozen signature digest
-(`tests/unit/test_public_api.py::test_public_operations_are_async_and_signatures_are_frozen`).
-
-### Added
-
-- MCP server and CLI for the IBM HMC REST API, the `hmc_mcp.api` supported facade, and the
-  ownership-stamp workflow operations.
-
-### Facade manifest
-
-Initial manifest of `hmc_mcp.api.__all__` (127 exports). This enumeration is the boundary the
-`[Unreleased]` manifest's delta is derived against, so it names the 0.1.0 export set and nothing
-added afterwards; every later addition is recorded above.
-
-`AdapterResult`, `AdapterType`, `AssignmentResult`, `WorkflowStep`, `AttachDiskResult`,
-`BootDeviceSelector`, `ConfigError`, `DecommissionResult`, `DedicatedPcieAssignment`,
-`DedicatedSlot`, `DeviceType`, `FleetHealthResult`, `HMCCLIError`, `HMCClient`, `HMCConfig`,
-`HMCError`, `HMCTransportError`, `InventoryResult`, `InventorySelector`, `LparCreation`,
-`LparCreationResult`, `LparPcieAssignments`, `LparPcieWorkflowResult`, `LparPowerResult`,
-`LparResources`, `LpmResult`, `LuType`, `MetricKind`, `PartitionType`,
-`PcieAssignmentUnavailableError`, `PcmCategory`, `ProvisionNetwork`, `ProvisionResult`,
-`ProvisionStorage`, `SriovAdapter`, `SriovLogicalPort`, `SriovLogicalPortAssignment`,
-`SriovLogicalPortCapabilityError`, `SriovLogicalPortChangeResult`,
-`SriovLogicalPortPartialError`, `SriovLogicalPortSnapshot`, `SriovMode`, `SriovPhysicalPort`,
-`StorageKind`, `VnicAssignment`, `VnicBackingSelector`, `VnicBackingSnapshot`,
-`VnicCapabilityError`, `VnicChangeResult`, `VnicPartialError`, `VnicSnapshot`,
-`abort_lpar_migration`, `add_network_adapter`, `add_vios_adapter`, `add_vnic`,
-`apply_lpar_pcie_assignments`, `assign_dedicated_pcie_slot`, `assign_sriov_logical_port`,
-`attach_disk_to_lpar`, `authorize_decommission_lpar_ownership_snapshot`,
-`authorize_lpar_mutation`, `capacity_report`, `clear_lpar_boot_order`, `create_and_stamp_lpar`,
-`create_logical_unit`, `create_media_repository`, `create_optical_media`,
-`create_virtual_disk`, `create_virtual_network`, `create_volume_group`, `decommission_lpar`,
-`delete_adapter`, `delete_logical_unit`, `delete_lpar`, `delete_media_repository`,
-`delete_optical_media`, `delete_virtual_disk`, `delete_virtual_network`,
-`deploy_partition_template`, `detach_storage_mapping`, `find_placement`, `fetch_fleet_health`,
-`get_media_repository`, `get_partition_template`, `get_pcm_preferences`, `list_adapters`,
-`list_dedicated_slots`, `list_fc_ports`, `list_network_bridges`, `list_optical_media`,
-`list_partition_templates`, `list_sea_adapters`, `list_sriov_adapters`,
-`list_sriov_logical_ports`, `list_sriov_physical_ports`, `list_storage_mappings`,
-`list_virtual_networks`, `list_virtual_switches`, `list_vnics`, `list_volume_groups`,
-`load_profile`, `fetch_lpar_summary`, `map_storage`, `metric_data`, `fetch_metric_links`, `migrate_lpar`,
-`power_lpar`, `power_system`, `power_vios`, `prevalidate_lpar_pcie_assignments`,
-`provision_lpar`, `read_lpar_boot_order`, `recover_lpar_migration`, `remote_restart_lpar`,
-`remove_vnic`, `rename_lpar`, `resolve_lpar_ownership_names`, `resolve_pcm_resource`,
-`set_lpar_boot_order`, `set_pcm_preferences`, `set_sriov_adapter_mode`,
-`stamp_created_lpar_ownership`, `fetch_system_summary`, `unassign_dedicated_pcie_slot`,
-`unassign_sriov_logical_port`, `upload_iso`
-
-[unreleased]: https://github.com/randomparity/hmc-mcp/compare/0.1.0...HEAD
+[unreleased]: https://github.com/randomparity/hmc-mcp/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/randomparity/hmc-mcp/releases/tag/v0.1.0
