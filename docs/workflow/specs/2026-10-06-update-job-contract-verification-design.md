@@ -24,12 +24,17 @@ Paths are relative to `docs/refs/hmc-rest-api-p11/jobs/`. Every job is a `PUT` J
 | `update.firmware` | `managedsystem-jobs/065-…:17`, JSON `PUT` (`:59-61`) | `:28-49`; HMC 11.1.1111 minimum (`:12`) | `Result` (`:335`), `COMPLETED_WITH_ERROR` (`:307`) terminal | matches; `PartitionMigration` appears only in a sample (`:242`) and is not modelled |
 
 `NOT_STARTED` conflicts: `121-…:42` and `102-…:36` call it a parameter-validation failure,
-while `../016-job-status.md:24` calls it not yet initiated. `TERMINAL_JOB_STATUSES` follows
-`016` because every job shares it, and a terminal `NOT_STARTED` would end every queued wait.
-So a console update or PTF listing the HMC rejects in validation surfaces, with `wait=True`,
-as the last-seen `NOT_STARTED` entry after the timeout. Which reading holds needs a live
-rejected submission; it is a gap below, not a confirmed defect. The two tools' descriptions
-say so, and tell the caller to read the job before submitting again.
+while `../016-job-status.md:24` calls it not yet initiated. `016` holds. An IBM engineer's
+answer, recorded on
+[#1373](https://github.com/randomparity/hmc-mcp/issues/1373#issuecomment-6126711058),
+says that for both jobs `NOT_STARTED` is the initial, non-terminal state, and that a job
+which fails parameter validation after the HMC picks it up ends `FAILED_TO_START`. A job
+still `NOT_STARTED` past a reasonable timeout is queued or stalled, not rejected. The answer
+cites a `ListManagementConsoleUpdates` submission with an unexpected parameter on V10R3
+SP1060 that went from `NOT_STARTED` to `FAILED_TO_START`. `TERMINAL_JOB_STATUSES` already
+treats `NOT_STARTED` as non-terminal and `FAILED_TO_START` as a failure, so the wait is
+unchanged. The two tools' descriptions say a timed-out `NOT_STARTED` job is queued or
+stalled, and tell the caller to read the job before submitting again.
 
 No defect is confirmed in the five job contracts, so no `src/` behaviour changes. The unmodelled
 `PartitionMigration` step appears in no parameter table, only in samples (`:242`, `:450`);
@@ -90,7 +95,7 @@ in `rows.json`.
 | `update.vios`, `upgrade.vios` | a disposable VIOS, images, free disks for upgrade, a window | not run |
 | `update.firmware` submit | POWER11 with HMC V11.1.1111 or later, images, a window | not run |
 | `update.firmware` on V10R3 | none | non-promoting check |
-| `NOT_STARTED` on a rejected console update or PTF listing | a live submission the HMC rejects in validation | not run |
+| `NOT_STARTED` on a rejected console update or PTF listing | a live submission the HMC rejects in validation | settled by IBM's answer on #1373; not run here |
 
 ## Success
 
