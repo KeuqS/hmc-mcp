@@ -10,6 +10,9 @@ Accepted (2026-09-22)
 >
 > **Amended** (2026-10-04, issue #1314): `operation="shutdown"` with `restart=True` and
 > `immediate=False` is refused. See *Amendment: the implicit dump restart* below.
+>
+> **Note** (2026-10-12, issue #1459): VIOS PowerOff stays `immediate`-only. See
+> *Note: VIOS PowerOff stays `immediate`-only* below.
 
 ## Context
 
