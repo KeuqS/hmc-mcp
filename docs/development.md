@@ -107,30 +107,34 @@ scripts/         # repository guardrails, generators, test runners, smoke checks
 
 ## Releasing
 
-A release is a version in `pyproject.toml` and an annotated Git tag on the same commit
-([ADR 0033](adr/0033-static-package-version.md)). Nothing is published to a package index,
-so the tag is what a consumer pins; the [README](../README.md#install) shows the form.
+A release is a version in `pyproject.toml` and a Git tag on the same commit
+([ADR 0033](adr/0033-static-package-version.md)); the tag is annotated. Nothing is published
+to a package index, so the tag is what a consumer pins; the [README](../README.md#install)
+shows the form.
 
 1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
    Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
-   heading (`tests/unit/test_changelog.py` requires the declared version to have one), and
-   update the README's pinned tag. When `pyproject.toml` already declares `X.Y.Z` and the
-   changelog already has its heading but the version was never tagged, as `0.1.0` was, skip
-   the bump and reconcile that existing section with `[Unreleased]` instead of adding a second
-   heading. Merge that change to `main`.
+   heading (`tests/unit/test_changelog.py` requires the declared version to have one), point
+   the changelog's link references at `vX.Y.Z` (the `[unreleased]` compare base and an
+   `[X.Y.Z]` tag link), and update the README's pinned tag. When `pyproject.toml` already
+   declares `X.Y.Z` and the changelog already has its heading but the version was never
+   tagged, as `0.1.0` was, skip the bump and reconcile that existing section with
+   `[Unreleased]` instead of adding a second heading. Merge that change to `main`.
 2. Choose the candidate: the `main` commit that change merged as. Its CI run must be green,
    and on a clean checkout of it `just verify` must pass.
 3. Run `just verification-report` on that checkout. It prints each operation's derived
    live-verification state ([ADR 0127](adr/0127-derived-live-verification-staleness.md)), and
-   `--fail-on-stale` exits 1 when any operation in the catalog is stale. Every operation the
-   release claims as live-verified must read `current`: re-run the arms that evidence a stale
-   one at the candidate, following [live testing](live-testing.md), and promote their
-   observations. Whether stale operations outside that claim hold the tag is the release
-   owner's decision, recorded on the release issue. Promoting observations merges a new commit,
-   so that commit becomes the candidate: repeat step 2 on it and re-read the report, which
-   stays `current` because the catalog is not in any operation's import closure. Nothing that
-   changes a claimed operation's import closure may merge between this check and the tag.
+   `--fail-on-stale` exits 1 when any operation in the catalog is stale, so the report alone
+   does not say which stale rows matter. Before reading it, list on the release issue the
+   operations the release claims as live-verified. Each listed operation must read `current`:
+   re-run the arms that evidence a stale one at the candidate, following
+   [live testing](live-testing.md), and promote their observations. Whether stale operations
+   outside that claim hold the tag is the release owner's decision, recorded on the release
+   issue. Promoting observations merges a new commit, so that commit becomes the candidate:
+   repeat step 2 on it and re-read the report, which stays `current` because the catalog is
+   not in any operation's import closure. Nothing that changes a claimed operation's import
+   closure may merge between this check and the tag.
 4. Tag that exact commit and push the tag:
 
    ```bash
