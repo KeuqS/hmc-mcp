@@ -123,7 +123,8 @@ A release is scoped by a release epic, an issue that names:
 
 - the consumer contract the release serves, and
 - the operations it claims as live-verified, by their `just verification-report` operation
-  names.
+  names, each with the live-testing arm and scenario that evidences it, taken from the
+  scenario id of its catalog observation. Those arms are the window's arm list.
 
 The claimed set is what the release promises; nothing outside it is promised, whatever its
 verification state. For 0.1.0 the epic is #871: the Tier A kdive adopt contract and the
@@ -132,9 +133,9 @@ reopens the window for any operation it adds.
 
 ### Freeze
 
-The candidate is the `main` commit whose code the release ships and the live window runs on.
-The operator names it on the release epic before the first arm runs, and the freeze starts
-then; it ends when the tag is pushed.
+The candidate is the `main` commit whose claimed operations' code the release ships and the
+live window runs on. The operator names it on the release epic before the first arm runs, and
+the freeze starts then; it ends when the tag is pushed.
 
 During the freeze, nothing may merge that changes the import closure of a claimed operation:
 the `.py` modules under `src/hmcpctl/` that
@@ -159,9 +160,10 @@ creates, mutates and deletes real partitions, so the operator authorizes every w
 explicitly, with:
 
 - the arm list, naming each arm the window may run;
-- the mutation boundary: the managed system and partitions the arms may change; and
+- the mutation boundary: the managed system and partitions the arms may change;
 - an explicit grant for any arm that touches a VIOS. A grant that does not name VIOS access
-  does not include it.
+  does not include it; and
+- the read-only reads that make up the window's independent baseline, below.
 
 The operator records the authorization on the release epic before the first arm runs. Each
 authorized arm then runs on the candidate as [live testing](live-testing.md) describes: the
@@ -171,7 +173,8 @@ every arm, including one that looked clean.
 The window also takes an independent read-only baseline of the mutation boundary before the
 first arm and after the last, separate from the baselines the arms record for themselves.
 Record the comparison on the release epic. Any difference holds the gate until it is
-recovered under live testing's "Confirm the system is clean" step, or explained there.
+recovered under live testing's "Confirm the system is clean" step, or explained on the
+release epic.
 
 Each arm's evidence matrix comes from `scripts/live_test_evidence.py`. The runner never
 writes into the catalog, so its observations are promoted by hand in evidence commits, as the
@@ -228,7 +231,8 @@ release.
 3. Re-read `just verification-report` on that checkout and confirm every claimed operation
    still reads `current`. If one reads anything else, either a merge moved its closure or its
    observation passed 90 days; in both cases re-run its evidencing arms, as the
-   [freeze](#freeze) rule says, before tagging.
+   [freeze](#freeze) rule says, before tagging. Record this read on the release epic with
+   the tag commit; the release notes' list of unclaimed stale operations comes from it.
 4. Tag that exact commit and push the tag:
 
    ```bash
@@ -241,7 +245,7 @@ release.
 5. Create the GitHub release from the pushed tag. Its notes are that version's changelog
    section when it fits GitHub's 125,000-character release-body limit; otherwise they are a
    short summary linking to that section of `CHANGELOG.md` at the tag. Either way, the notes
-   list the stale operations the release does not claim, from the evidence gate. Check the
+   list the stale operations the release does not claim, from the step 3 read. Check the
    notes file's length before running:
 
    ```bash
