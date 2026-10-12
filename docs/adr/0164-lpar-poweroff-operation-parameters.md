@@ -129,6 +129,19 @@ refusal. kdive's `cycle` and `reset` (`immediate=true`) and `hmc_power_lpar` (AD
 form the combination. `lpar.power_off` stays `stale (closure-changed)`; nothing here promotes
 it.
 
+## Note: VIOS PowerOff stays `immediate`-only
+
+The VIOS PowerOff job documents the same three request parameters as the LPAR job
+(`docs/refs/hmc-rest-api-p11/jobs/virtualioserver-jobs/151-poweroff_virtualioserver-job.md:28-30`),
+but `power_off_vios_job` (`jobs/requests.py`) and `hmc_power_off_vios` expose only `immediate`.
+That is deliberate, not an omission: this record's reason for widening the LPAR builder was a
+named consumer need (kdive's `cycle`, `reset`, graceful and force-crash actions on a partition),
+and no consumer has asked for a restarting or dumping VIOS power-off. A VIOS also carries client
+partitions' storage and network, so a dump restart there is a larger blast radius than the LPAR
+case this record gates, with no opt-in designed for it. Widening the tool needs a consumer request
+and its own decision on the vocabulary and the `allow_dump_restart` analogue; no live VIOS
+PowerOff has been captured either, so behaviour of the extra parameters on a VIOS is unverified.
+
 ## Considered & rejected
 
 - **Admit `dumpretry` with the other three.** verified: the reference lists it as a fourth
