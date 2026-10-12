@@ -327,6 +327,18 @@ matches by UUID. PR #558 applied this containment to both the optional-selector
 and required-selector guarded chains; issue #462's duplicate-name regression
 coverage records the required-selector boundary.
 
+**Deriving the system from the partition was surveyed and is available.** Whether
+a `LogicalPartition` names its parent managed system was the open question in #466.
+A live survey answered it: in the single-entry read, the per-system feed and the
+fleet-wide feed, every partition on V10R3 and V11R2 — `not activated` and
+`open firmware` ones included — carries an `AssociatedManagedSystem` `href` that is
+the bare `ManagedSystem/<uuid>` of its parent (the base `V1_0` schema; a migrating
+partition was not sampled). The evidence is
+`docs/workflow/lpar-parent-system-survey-466.md`. It rules out "the HMC does not say",
+not the discovery walk: replacing the walk with the link is a code change behind
+`_discover_owning_system` that this ADR does not make, and it is recorded as its
+own decision when taken.
+
 **The cost, stated.** Guarding `power_lpar` costs **one SSH login plus two REST
 GETs** on every call that does not carry `ownership_override=True`.
 
