@@ -112,6 +112,88 @@ A release is a version in `pyproject.toml` and a Git tag on the same commit
 to a package index, so the tag is what a consumer pins; the [README](../README.md#install)
 shows the form.
 
+A release runs in the order of the subsections below: scope it, verify it live, freeze `main`,
+review the docs and cut the changelog, tag it, then reopen `main`. Each subsection says who
+decides what. The operator is the maintainer who owns the release.
+
+### Scope
+
+A release is scoped by a release epic, an issue that names:
+
+- the consumer contract the release serves, and
+- the operations it claims as live-verified, by their `just verification-report` operation
+  names.
+
+The claimed set is what the release promises; nothing outside it is promised, whatever its
+verification state. For 0.1.0 the epic is #871: the Tier A kdive adopt contract and the
+Tier B bare-CEC path, 15 claimed operations. Changing the claimed set after the live window
+reopens the window for any operation it adds.
+
+### Live window
+
+The live window produces the evidence that makes each claimed operation `current`. A live run
+creates, mutates and deletes real partitions, so the operator authorizes every window
+explicitly, with:
+
+- the arm list, naming each arm the window may run;
+- the mutation boundary: the managed system and partitions the arms may change; and
+- an explicit grant for any arm that touches a VIOS. A grant that does not name VIOS access
+  does not include it.
+
+The operator records the authorization on the release epic before the first arm runs. Each
+authorized arm then runs as [live testing](live-testing.md) describes: the preflight, the
+arm, and the recovery check, in that order, with the recovery check run after every arm,
+including one that looked clean. The window also takes an independent read-only baseline of
+the mutation boundary before the first arm and after the last, separate from the baselines
+the arms record for themselves, and the two are compared. The window runs on the candidate,
+the commit the release is verified on. Each arm's observations are promoted into the catalog
+as the [capability catalog](capabilities/README.md) describes under "Recording an observation",
+and its evidence matrix comes from `scripts/live_test_evidence.py`.
+
+### Evidence gate
+
+Run `just verification-report` on a clean checkout of the candidate. It prints each
+operation's derived live-verification state
+([ADR 0127](adr/0127-derived-live-verification-staleness.md)).
+
+- **Gating:** every claimed operation must read `current`. A claimed operation that reads
+  anything else holds the tag until its evidencing arms re-run at the candidate and their
+  observations are promoted.
+- **Reported, not gating:** `--fail-on-stale` exits 1 when any operation in the whole catalog
+  is stale, including operations the release does not claim and its window did not cover.
+  Run it and record its result on the release epic, but its exit status does not hold the
+  tag. List each stale operation the release does not claim in the release notes. At 0.1.0
+  the catalog's 163 operations read 17 current, 90 stale, 39 unevidenced and 17 unrecorded.
+
+No check yet reads the claimed set alone, so compare the claimed rows against the report by
+hand. The check that passes is the one recorded on the epic, with the candidate's commit.
+
+### Freeze
+
+The freeze starts at the candidate, the commit the window verified, and ends when the tag
+is pushed. During it, nothing may merge that changes the import closure of a claimed
+operation, the module set ADR 0127 fingerprints. These may still merge:
+
+- documentation, including the changelog cut below;
+- evidence-only commits that promote observations into the catalog, which is in no
+  operation's import closure.
+
+A merge that does move a claimed operation's closure re-stales that operation. Re-run its
+evidencing arms at the new tip, under the window's authorization or a new one, and re-read
+the gate there; never argue that the delta is harmless. The new tip becomes the candidate.
+
+### Docs and changelog
+
+Before the tag, review the user-facing documentation against the candidate, and cut the
+changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main` as
+documentation commits during the freeze. For 0.1.0 that work is #1468.
+
+### Tag and release
+
+The operator authorizes the tag after the gate passes, and authorizes the GitHub release
+separately, after the tag. An agent or automated workflow never creates the tag or the
+release.
+
 1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
    Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
@@ -121,34 +203,34 @@ shows the form.
    declares `X.Y.Z` and the changelog already has its heading but the version was never
    tagged, as `0.1.0` was, skip the bump and reconcile that existing section with
    `[Unreleased]` instead of adding a second heading. Merge that change to `main`.
-2. Choose the candidate: the `main` commit that change merged as. Its CI run must be green,
+2. Choose the tag commit: the `main` commit that change merged as. Its CI run must be green,
    and on a clean checkout of it `just verify` must pass.
-3. Run `just verification-report` on that checkout. It prints each operation's derived
-   live-verification state ([ADR 0127](adr/0127-derived-live-verification-staleness.md)), and
-   `--fail-on-stale` exits 1 when any operation in the catalog is stale, so the report alone
-   does not say which stale rows matter. Before reading it, list on the release issue the
-   operations the release claims as live-verified. Each listed operation must read `current`:
-   re-run the arms that evidence a stale one at the candidate, following
-   [live testing](live-testing.md), and promote their observations. Whether stale operations
-   outside that claim hold the tag is the release owner's decision, recorded on the release
-   issue. Promoting observations merges a new commit, so that commit becomes the candidate:
-   repeat step 2 on it and re-read the report, which stays `current` because the catalog is
-   not in any operation's import closure. Nothing that changes a claimed operation's import
-   closure may merge between this check and the tag.
+3. Re-read `just verification-report` on that checkout and confirm every claimed operation
+   still reads `current`. It does when only documentation and evidence-only commits merged
+   since the candidate, because neither is in an operation's import closure. If a claimed
+   operation reads anything else, the freeze was broken: go back to the
+   [freeze](#freeze) rule before tagging.
 4. Tag that exact commit and push the tag:
 
    ```bash
-   git tag -a vX.Y.Z -m "hmcpctl X.Y.Z" <candidate-sha>
+   git tag -a vX.Y.Z -m "hmcpctl X.Y.Z" <tag-commit-sha>
    git push origin vX.Y.Z
    ```
 
-   Check that `git rev-parse vX.Y.Z^{commit}` prints the candidate and that
+   Check that `git rev-parse vX.Y.Z^{commit}` prints the tag commit and that
    `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
 5. Create the GitHub release from the pushed tag. Its notes are that version's changelog
    section when it fits GitHub's 125,000-character release-body limit; otherwise they are a
-   short summary linking to that section of `CHANGELOG.md` at the tag. Check the notes file's
-   length before running:
+   short summary linking to that section of `CHANGELOG.md` at the tag. Either way, the notes
+   list the stale operations the release does not claim, from the evidence gate. Check the
+   notes file's length before running:
 
    ```bash
    gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z" --notes-file <notes.md>
    ```
+
+### After the release
+
+Pushing the tag ends the freeze, and `main` reopens to every change. Close the release epic
+and open the next one, or adopt an existing epic for it, naming its claimed operations and
+consumer contract as in [scope](#scope). The 0.2.0 epic is #1215.
