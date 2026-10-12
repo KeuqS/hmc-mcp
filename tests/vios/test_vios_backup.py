@@ -126,6 +126,42 @@ def test_list_vios_backups_returns_empty_list(monkeypatch, capture):
     assert result == []
 
 
+def test_list_vios_backups_parses_live_backup_row(monkeypatch):
+    """A viosioconfig backup is listed with its `.tar.gz` catalog name (#1458).
+
+    V10R3 answers the exact `lsviosbk ... -F name,type --header` command the
+    tool issues with the header `name,type` and one row per backup, and lists a
+    backup made with `-f <name>` as `<name>.tar.gz`.
+    """
+    _hmc_env(monkeypatch)
+    recorded = live_fixture("cli-lsviosbk-rows")
+    assert recorded["exit_status"] == 0
+    conn_mock = _make_ssh_mock(recorded["stdout"])
+
+    with patch("hmcpctl.ssh.transport.asyncssh.connect", return_value=conn_mock):
+        result = hmc_list_vios_backups(VIOS_UUID)
+
+    assert result == [
+        {"name": "hmcpctl-live-q1458-458edb12.tar.gz", "type": "viosioconfig"}
+    ]
+
+
+def test_list_vios_backups_rejects_the_hmc_wide_listing_header(monkeypatch):
+    """`lsviosbk -F --header` answers more columns than the tool asks for.
+
+    The parser pins the `name,type` header, so the HMC-wide shape is refused
+    rather than read column by column (#1458).
+    """
+    _hmc_env(monkeypatch)
+    conn_mock = _make_ssh_mock(live_fixture("cli-lsviosbk-all-rows")["stdout"])
+
+    with (
+        patch("hmcpctl.ssh.transport.asyncssh.connect", return_value=conn_mock),
+        pytest.raises(ValueError, match="expected the exact header"),
+    ):
+        hmc_list_vios_backups(VIOS_UUID)
+
+
 @pytest.mark.parametrize(
     "output",
     [

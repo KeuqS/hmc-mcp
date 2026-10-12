@@ -1,0 +1,7 @@
+{
+  "capture": "2026-10-12-q1458/mk-session.jsonl#during-all",
+  "command": "lsviosbk -F --header",
+  "exit_status": 0,
+  "stdout": "name,type,sys_name,mtms,vios_name,vios_id,vios_uuid,last_modified,size\nhmcpctl-live-q1458-458edb12.tar.gz,viosioconfig,sys-R1,8375-42A*<REDACTED-SERIAL>,sys-R1-vios1,100,00000064-ABCD-4EF0-8ABC-000000000064,10/12/2026 19:36:14,7.330\n",
+  "stderr": ""
+}
