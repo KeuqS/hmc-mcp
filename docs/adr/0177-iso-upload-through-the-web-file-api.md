@@ -47,6 +47,17 @@ The HMC echoed the elements in its own order: `Filename`, `DateModified`, `Inter
 request sends the proven five, in the order above. `DateModified` and `FileUUID` are read-only
 (`kb="ROR"`).
 
+The capture does not state the `Filename` grammar. `upload_iso` refuses a `media_name`
+outside `^[A-Za-z0-9_.]{1,79}$` before any request, and that pattern is an **uncaptured
+assumption**: it entered `src/` in commit 61ee6960 with no cited capture or reference, a
+search of the vendored reference (the web File document has no page there; `AddOpticalMedia`
+lists `FileName` with no pattern) and of the committed captures finds no source. No name outside the
+pattern is known to have been sent to an HMC, so the rule may be stricter than the HMC's. The
+refusal message says so. Reconsider it when an operator-authorized window tests an
+edge-case name (a hyphen, or a name of 80 or more characters) or a reference states the
+grammar, or the HMC's web File schema (fetchable read-only from an HMC) is
+captured.
+
 ## Decision
 
 `upload_iso` uses the web File flow above. It sends that exact element order and those exact
