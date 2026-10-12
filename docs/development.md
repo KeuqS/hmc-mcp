@@ -112,6 +112,15 @@ A release is a version in `pyproject.toml` and a Git tag on the same commit
 to a package index, so the tag is what a consumer pins; the [README](../README.md#install)
 shows the form.
 
+Versions are semver. The tag is `vX.Y.Z`, and the GitHub release is titled
+`hmcpctl X.Y.Z (<short-sha>)`, where `<short-sha>` is the tagged commit's short ID. The version
+is static in `pyproject.toml`, as ADR 0033 sets out, and stays so for 0.1.0. From 0.2.0 the
+version is planned to be derived from Git with hatch-vcs instead (#1471, an ADR superseding
+0033): a tagged build would be `X.Y.Z`, and an untagged one `X.Y.(Z+1).devN+g<sha>`, marked
+when the tree is dirty. Until #1471 lands, the steps below use the static version. Either way
+the changelog heading stays `## [X.Y.Z] - YYYY-MM-DD`, because a commit cannot name its own
+SHA.
+
 A release runs in the order of the subsections below: scope it, name the candidate and freeze
 `main`, verify the candidate live, read the evidence gate, review the docs and cut the
 changelog, tag it, then reopen `main`. Each subsection says who decides what. The operator is
@@ -193,9 +202,9 @@ prints each operation's derived live-verification state (ADR 0127).
 - **Reported, not gating:** `--fail-on-stale` exits 1 when any operation in the whole catalog
   is stale, including operations the release does not claim and its window did not cover.
   Run it and record its result on the release epic, but its exit status does not hold the
-  tag. List each stale operation the release does not claim in the release notes. Before
-  the 0.1.0 window, on 2026-10-12, the catalog's 163 operations read 17 current, 90 stale,
-  39 unevidenced and 17 unrecorded.
+  tag. List each stale operation the release does not claim in the changelog entry's
+  Known issues list. Before the 0.1.0 window, on 2026-10-12, the catalog's 163 operations
+  read 17 current, 90 stale, 39 unevidenced and 17 unrecorded.
 
 No check yet reads the claimed set alone, so compare the claimed rows against the report by
 hand. Record the pass on the epic with both commits: the candidate and the commit the gate
@@ -211,6 +220,17 @@ Before the tag, review the user-facing documentation against the candidate, and 
 changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main`
 during the freeze. For 0.1.0 that work is #1468.
 
+A release's changelog entry is minimal, and it is also the GitHub release body. It holds:
+
+- a short statement of the release's scope and the consumer contract it serves;
+- the claimed operations, each verified `current` at the gate; and
+- a **Known issues** list that names concrete problems, including every stale operation the
+  release does not claim. An entry without one is incomplete.
+
+The itemized history of what changed between releases is not carried into the entry; Git
+history keeps it. For 0.1.0 the itemized pre-release history is dropped from the changelog
+for that reason.
+
 ### Tag and release
 
 The operator authorizes the tag after the gate passes, and authorizes the GitHub release
@@ -219,20 +239,23 @@ release.
 
 1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
-   Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
-   heading (`tests/unit/test_changelog.py` requires the declared version to have one), point
-   the changelog's link references at `vX.Y.Z` (the `[unreleased]` compare base and an
-   `[X.Y.Z]` tag link), and update the README's pinned tag. When `pyproject.toml` already
+   Replace the `[Unreleased]` entries in `CHANGELOG.md` with the version's minimal entry,
+   described under [docs and changelog](#docs-and-changelog), under a dated
+   `## [X.Y.Z] - YYYY-MM-DD` heading (`tests/unit/test_changelog.py` requires the declared
+   version to have one). Point the changelog's link references at `vX.Y.Z` (the
+   `[unreleased]` compare base and an `[X.Y.Z]` tag link), and update the README's pinned
+   tag. When `pyproject.toml` already
    declares `X.Y.Z` and the changelog already has its heading but the version was never
-   tagged, as `0.1.0` was, skip the bump and reconcile that existing section with
-   `[Unreleased]` instead of adding a second heading. Merge that change to `main`.
+   tagged, as `0.1.0` was, skip the bump and rewrite that existing section as the minimal
+   entry instead of adding a second heading. Merge that change to `main`.
 2. Choose the tag commit: the `main` commit that change merged as. Its CI run must be green,
    and on a clean checkout of it `just verify` must pass.
 3. Re-read `just verification-report` on that checkout and confirm every claimed operation
    still reads `current`. If one reads anything else, either a merge moved its closure or its
    observation passed 90 days; in both cases re-run its evidencing arms, as the
    [freeze](#freeze) rule says, before tagging. Record this read on the release epic with
-   the tag commit; the release notes' list of unclaimed stale operations comes from it.
+   the tag commit. Its unclaimed stale operations must match the entry's Known issues list;
+   if they do not, correct the entry, merge it, and repeat from step 2 on that commit.
 4. Tag that exact commit and push the tag:
 
    ```bash
@@ -242,14 +265,15 @@ release.
 
    Check that `git rev-parse vX.Y.Z^{commit}` prints the tag commit and that
    `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
-5. Create the GitHub release from the pushed tag. Its notes are that version's changelog
-   section when it fits GitHub's 125,000-character release-body limit; otherwise they are a
-   short summary linking to that section of `CHANGELOG.md` at the tag. Either way, the notes
-   list the stale operations the release does not claim, from the step 3 read. Check the
-   notes file's length before running:
+5. Create the GitHub release from the pushed tag. Its body is the version's changelog entry,
+   which a minimal entry keeps far below GitHub's 125,000-character release-body limit; check
+   the notes file's length anyway, because GitHub refuses a longer body. Its title carries the
+   tagged commit's short ID:
 
    ```bash
-   gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z" --notes-file <notes.md>
+   short_sha=$(git rev-parse --short "vX.Y.Z^{commit}")
+   gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z ($short_sha)" \
+     --notes-file <notes.md>
    ```
 
 ### After the release
