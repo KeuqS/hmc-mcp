@@ -342,13 +342,13 @@ async def test_upload_iso_name_collision(mock_hmc, stage_download):
 async def test_upload_iso_refuses_an_invalid_media_name_before_the_download(
     mock_hmc, stage_download
 ):
-    """A media_name outside HMC's FileName.Pattern is refused without a fetch."""
+    """A media_name outside the assumed Filename grammar is refused without a fetch."""
     download = stage_download()
     config = make_config(iso_url_allowlist=ISO_HOST)
     async with HMCClient(config) as hmc:
         hmc.list_optical_media = _visible_after_upload()
 
-        with pytest.raises(ValueError, match="media_name"):
+        with pytest.raises(ValueError, match="not one the HMC documents"):
             await upload_iso(
                 hmc,
                 VIOS_UUID,
