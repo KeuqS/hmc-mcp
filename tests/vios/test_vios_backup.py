@@ -129,9 +129,10 @@ def test_list_vios_backups_returns_empty_list(monkeypatch, capture):
 def test_list_vios_backups_parses_live_backup_row(monkeypatch):
     """A viosioconfig backup is listed with its `.tar.gz` catalog name (#1458).
 
-    V10R3 answers the exact `lsviosbk ... -F name,type --header` command the
-    tool issues with the header `name,type` and one row per backup, and lists a
-    backup made with `-f <name>` as `<name>.tar.gz`.
+    V10R3 answers an `lsviosbk --filter vios_uuids=... -F name,type --header`
+    command, shaped like the one the tool issues, with the header `name,type`
+    and one row per backup, and lists a backup made with `-f <name>` as
+    `<name>.tar.gz`.
     """
     _hmc_env(monkeypatch)
     recorded = live_fixture("cli-lsviosbk-rows")
