@@ -906,7 +906,7 @@ async def upload_iso(
     has put on ``iso_url_allowlist`` (``HMC_ISO_URL_ALLOWLIST``), and both
     conditions are checked before any other work happens. **With no allowlist
     configured every URL is refused** — see ``_require_allowlisted_iso_url`` and
-    ADR 0050. The media name is then validated against HMC's FileName.Pattern,
+    ADR 0050. The media name is then validated against a conservative assumed grammar (ADR 0177),
     the volume group must hold a media repository, and a name that collides with
     existing media is refused, all before any transfer begins. The ISO is
     downloaded with explicit timeout and size bounds and without following
@@ -953,12 +953,16 @@ async def upload_iso(
         hmc, vios_name_or_uuid, system_name_or_uuid=system_name_or_uuid
     )
 
+    # An uncaptured assumption (ADR 0177): no capture or reference states the HMC's
+    # Filename grammar. The pattern is a conservative client-side allowlist, and no
+    # name outside it has been sent to an HMC, so the HMC may accept more.
     _HMC_FILENAME_RE = re.compile(r"^[A-Za-z0-9_.]{1,79}$")
     if not _HMC_FILENAME_RE.match(media_name):
         raise ValueError(
-            f"media_name {media_name!r} is invalid. "
-            "HMC only accepts filenames matching [A-Za-z0-9_.]{1,79} "
-            "(no hyphens, spaces, or other special characters)."
+            f"media_name {media_name!r} is refused by hmcpctl before any request. "
+            "It must match [A-Za-z0-9_.]{1,79} (no hyphens, spaces, or other special "
+            "characters); this is a conservative rule hmcpctl assumes, not one the "
+            "HMC documents, and the HMC may accept more."
         )
 
     if await hmc.get_media_repository(vios_uuid, vg_uuid) is None:
