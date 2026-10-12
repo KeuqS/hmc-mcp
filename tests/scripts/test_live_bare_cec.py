@@ -717,7 +717,7 @@ def test_a_never_confirmed_fixture_goes_to_the_shared_guards(schemas):
 
 
 def test_an_empty_refcode_read_is_not_promoted(schemas):
-    """The tool answers [] for an unknown partition too, so [] proves nothing."""
+    """A partition with no reference codes reads [], so [] proves nothing."""
     world, state = World(), _state(schemas)
     world.overrides["hmc_read_lpar_refcodes"] = lambda _k: []
 

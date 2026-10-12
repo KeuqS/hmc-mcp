@@ -5,10 +5,10 @@ Design: docs/workflow/specs/2026-09-21-bounded-lpar-refcode-read-design.md
 
 import asyncio
 import shlex
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from conftest import live_fixture
+from conftest import live_fixture, live_process_error
 
 from hmcpctl.config import HMCConfig
 from hmcpctl.ssh.refcodes import (
@@ -176,15 +176,34 @@ def test_rows_for_another_partition_are_refused(monkeypatch):
     ],
 )
 def test_empty_results_are_an_empty_list(monkeypatch, stdout):
-    """Blank stdout, the HMC's sentinel, and a bare header all mean no rows.
-
-    The bare-header case is also the design's assumed response for a partition
-    that does not exist, so this is the test that goes red if that assumption
-    is ever replaced with a distinct error.
-    """
+    """Blank stdout, the HMC's sentinel, and a bare header all mean no rows."""
     _transport(monkeypatch, stdout)
 
     assert _run(list_lpar_refcodes(_config(), "sys1", "nosuchlpar")) == []
+
+
+def test_an_unknown_partition_is_the_hmcs_refusal_not_an_empty_list():
+    """The HMC refuses a partition it does not know with exit 1 and HSCL8012 (#893).
+
+    Observed live, not assumed: the refusal is on stdout with stderr empty, so
+    the reader raises rather than returning ``[]``, and a caller cannot mistake
+    a mistyped name for a partition with no reference codes.
+    """
+    capture = live_fixture("cli-refcodes-unknown-lpar")
+    connection = AsyncMock()
+    connection.run = AsyncMock(
+        side_effect=live_process_error("cli-refcodes-unknown-lpar")
+    )
+    connection.__aenter__ = AsyncMock(return_value=connection)
+    connection.__aexit__ = AsyncMock(return_value=False)
+
+    with (
+        patch("hmcpctl.ssh.transport.asyncssh.connect", return_value=connection),
+        pytest.raises(HMCCLIError, match="exit status 1.*HSCL8012"),
+    ):
+        _run(list_lpar_refcodes(_config(), "sys-R1", "hmcpctl-nonexistent-q893"))
+
+    assert connection.run.await_args.args[0] == capture["command"]
 
 
 def test_header_mismatch_raises_hmc_cli_error(monkeypatch):

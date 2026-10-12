@@ -33,6 +33,10 @@ not-activated partition, from a system other than the #1161 one. Its partition n
 name's suffix and these were not synthetic, and its `MACAddressPrefix` values and one `Uptime` are zeroed. Its token map is its own, as for the exports above.
 `docs/workflow/lpar-parent-system-survey-466.md` records what the capture shows.
 
+`cli-refcodes-unknown-lpar` (`capture` prefix `2026-10-12-q893/`) is a read-only capture for #893
+on an HMC at V10R3 SP1060 managing a POWER8 8247-22L: the reader's `lsrefcode` command against a
+synthetic partition name the HMC does not know.
+
 ## Format
 
 Every file is a JSON object with these keys:
