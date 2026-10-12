@@ -108,6 +108,12 @@ categories. Domain-module APIs remain pre-release and are not facade movement.
 
 ### Fixed
 
+- `hmc_set_lpar_msp` and `hmc lpars set-msp` can target a VIOS, the only partition type
+  `msp` is valid for (#1318). The target resolves by name or UUID through the selected
+  system's `VirtualIOServer` feed and crosses ADR 0092's ownership rule; a selector outside
+  that feed is refused before any SSH command. The CLI previously skipped the ownership
+  check entirely and now accepts `--ownership-override`.
+
 - `hmc_create_vios_vfc_group_label` and `hmc_update_vios_vfc_group_label` refuse a vFC group
   label or rename `new_name` longer than 16 characters before any HMC call; the tool
   descriptions and the help for `hmcpctl vios create-vfc-group-label` LABEL and

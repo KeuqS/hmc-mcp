@@ -45,12 +45,14 @@ ADR 0092 §1's rule that the guard lives in the operations layer.
 
 ## Architecture and ownership
 
-Owner: `operations/lpar/ownership.py` gains `resolve_and_authorize_vios_names(hmc,
-system_name_or_uuid, vios_name_or_uuid, *, ownership_override=False) -> tuple[str, str]`
-beside `resolve_and_authorize_lpar_names`; it reuses `resolve_system_uuid`,
-`_resolve_system_name` and `authorize_lpar_mutation` unchanged, and the client's
-`list_vios`. `configure_lpar_msp` calls it in place
-of the LPAR helper. Callers: MCP
+Owner: `operations/lpar/configuration.py` gains a private
+`_resolve_and_authorize_vios_names(hmc, system_name_or_uuid, vios_name_or_uuid, *,
+ownership_override) -> tuple[str, str]` beside its sole caller `configure_lpar_msp`; it
+reuses `resolve_system_uuid`, `_hosts_partition`, `_resolve_system_name` and
+`authorize_lpar_mutation` unchanged, and the client's `list_vios`. It lives there, not in
+`ownership.py`, because the capability inventory fingerprints each operation's module
+closure: an addition to `ownership.py` marked the unrelated `boot_order.*` live evidence
+stale, while `configuration.py`'s operations were already stale. Callers: MCP
 `hmc_set_lpar_msp` (unchanged) and CLI `lpars_set_msp` (migrated).
 No obsolete path remains; the LPAR helper keeps its other callers.
 
