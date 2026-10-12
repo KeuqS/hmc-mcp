@@ -112,9 +112,10 @@ A release is a version in `pyproject.toml` and a Git tag on the same commit
 to a package index, so the tag is what a consumer pins; the [README](../README.md#install)
 shows the form.
 
-A release runs in the order of the subsections below: scope it, verify it live, freeze `main`,
-review the docs and cut the changelog, tag it, then reopen `main`. Each subsection says who
-decides what. The operator is the maintainer who owns the release.
+A release runs in the order of the subsections below: scope it, name the candidate and freeze
+`main`, verify the candidate live, read the evidence gate, review the docs and cut the
+changelog, tag it, then reopen `main`. Each subsection says who decides what. The operator is
+the maintainer who owns the release.
 
 ### Scope
 
@@ -129,6 +130,28 @@ verification state. For 0.1.0 the epic is #871: the Tier A kdive adopt contract 
 Tier B bare-CEC path, 15 claimed operations. Changing the claimed set after the live window
 reopens the window for any operation it adds.
 
+### Freeze
+
+The candidate is the `main` commit whose code the release ships and the live window runs on.
+The operator names it on the release epic before the first arm runs, and the freeze starts
+then; it ends when the tag is pushed.
+
+During the freeze, nothing may merge that changes the import closure of a claimed operation:
+the `.py` modules under `src/hmcpctl/` that
+[ADR 0127](adr/0127-derived-live-verification-staleness.md) fingerprints for it. That test is
+the whole rule. Changes that pass it include:
+
+- documentation, including the docs review and changelog cut below;
+- the release-prep commit of [tag and release](#tag-and-release) step 1, which changes
+  `pyproject.toml`, `uv.lock`, the changelog and the README's pinned tag; and
+- evidence commits that promote observations into the catalog, including the
+  `src/hmcpctl/_operation_maturity.json` projection they regenerate, which is data, not a
+  module.
+
+A merge that does move a claimed operation's closure re-stales that operation. Re-run its
+evidencing arms at the new tip, under the window's authorization or a new one, and re-read
+the gate there; never argue that the delta is harmless. The new tip becomes the candidate.
+
 ### Live window
 
 The live window produces the evidence that makes each claimed operation `current`. A live run
@@ -141,20 +164,25 @@ explicitly, with:
   does not include it.
 
 The operator records the authorization on the release epic before the first arm runs. Each
-authorized arm then runs as [live testing](live-testing.md) describes: the preflight, the
-arm, and the recovery check, in that order, with the recovery check run after every arm,
-including one that looked clean. The window also takes an independent read-only baseline of
-the mutation boundary before the first arm and after the last, separate from the baselines
-the arms record for themselves, and the two are compared. The window runs on the candidate,
-the commit the release is verified on. Each arm's observations are promoted into the catalog
-as the [capability catalog](capabilities/README.md) describes under "Recording an observation",
-and its evidence matrix comes from `scripts/live_test_evidence.py`.
+authorized arm then runs on the candidate as [live testing](live-testing.md) describes: the
+preflight, the arm, and the recovery check, in that order, with the recovery check run after
+every arm, including one that looked clean.
+
+The window also takes an independent read-only baseline of the mutation boundary before the
+first arm and after the last, separate from the baselines the arms record for themselves.
+Record the comparison on the release epic. Any difference holds the gate until it is
+recovered under live testing's "Confirm the system is clean" step, or explained there.
+
+Each arm's evidence matrix comes from `scripts/live_test_evidence.py`. The runner never
+writes into the catalog, so its observations are promoted by hand in evidence commits, as the
+[capability catalog](capabilities/README.md) describes under "Recording an observation".
 
 ### Evidence gate
 
-Run `just verification-report` on a clean checkout of the candidate. It prints each
-operation's derived live-verification state
-([ADR 0127](adr/0127-derived-live-verification-staleness.md)).
+Read the gate on the `main` commit that carries the promoted observations: the candidate plus
+the evidence commits the freeze admits. At the candidate itself the window's observations are
+not in the catalog yet. Run `just verification-report` on a clean checkout of that commit. It
+prints each operation's derived live-verification state (ADR 0127).
 
 - **Gating:** every claimed operation must read `current`. A claimed operation that reads
   anything else holds the tag until its evidencing arms re-run at the candidate and their
@@ -162,31 +190,23 @@ operation's derived live-verification state
 - **Reported, not gating:** `--fail-on-stale` exits 1 when any operation in the whole catalog
   is stale, including operations the release does not claim and its window did not cover.
   Run it and record its result on the release epic, but its exit status does not hold the
-  tag. List each stale operation the release does not claim in the release notes. At 0.1.0
-  the catalog's 163 operations read 17 current, 90 stale, 39 unevidenced and 17 unrecorded.
+  tag. List each stale operation the release does not claim in the release notes. Before
+  the 0.1.0 window, on 2026-10-12, the catalog's 163 operations read 17 current, 90 stale,
+  39 unevidenced and 17 unrecorded.
 
 No check yet reads the claimed set alone, so compare the claimed rows against the report by
-hand. The check that passes is the one recorded on the epic, with the candidate's commit.
+hand. Record the pass on the epic with both commits: the candidate and the commit the gate
+was read on.
 
-### Freeze
-
-The freeze starts at the candidate, the commit the window verified, and ends when the tag
-is pushed. During it, nothing may merge that changes the import closure of a claimed
-operation, the module set ADR 0127 fingerprints. These may still merge:
-
-- documentation, including the changelog cut below;
-- evidence-only commits that promote observations into the catalog, which is in no
-  operation's import closure.
-
-A merge that does move a claimed operation's closure re-stales that operation. Re-run its
-evidencing arms at the new tip, under the window's authorization or a new one, and re-read
-the gate there; never argue that the delta is harmless. The new tip becomes the candidate.
+An observation goes stale either when its closure changes or when it is older than 90 days
+(ADR 0127). A long freeze can therefore re-stale a claimed operation with no merge at all;
+the remedy is the same, re-running its evidencing arms.
 
 ### Docs and changelog
 
 Before the tag, review the user-facing documentation against the candidate, and cut the
-changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main` as
-documentation commits during the freeze. For 0.1.0 that work is #1468.
+changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main`
+during the freeze. For 0.1.0 that work is #1468.
 
 ### Tag and release
 
@@ -206,10 +226,9 @@ release.
 2. Choose the tag commit: the `main` commit that change merged as. Its CI run must be green,
    and on a clean checkout of it `just verify` must pass.
 3. Re-read `just verification-report` on that checkout and confirm every claimed operation
-   still reads `current`. It does when only documentation and evidence-only commits merged
-   since the candidate, because neither is in an operation's import closure. If a claimed
-   operation reads anything else, the freeze was broken: go back to the
-   [freeze](#freeze) rule before tagging.
+   still reads `current`. If one reads anything else, either a merge moved its closure or its
+   observation passed 90 days; in both cases re-run its evidencing arms, as the
+   [freeze](#freeze) rule says, before tagging.
 4. Tag that exact commit and push the tag:
 
    ```bash
