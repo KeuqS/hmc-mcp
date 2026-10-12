@@ -30,7 +30,7 @@ capture for #627 on the V11R2 HMC and POWER11 9824-42A system above.
 #466 on the V10R3 HMC: a `ManagedSystem/<uuid>/LogicalPartition` feed of one running and one
 not-activated partition, from a system other than the #1161 one. Its partition names are
 `sys-R13-lp1` and `sys-R13-lp2`, renamed from the exporter's output because the exporter keeps a
-name's suffix and these were not synthetic. Its token map is its own, as for the exports above.
+name's suffix and these were not synthetic, and its `MACAddressPrefix` values and one `Uptime` are zeroed. Its token map is its own, as for the exports above.
 `docs/workflow/lpar-parent-system-survey-466.md` records what the capture shows.
 
 ## Format

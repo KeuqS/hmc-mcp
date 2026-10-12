@@ -1,10 +1,10 @@
 # LogicalPartition parent-system link survey — issue #466
 
-**Finding: positive.** Every `LogicalPartition` the HMC returned — in the
+**Finding: positive.** Every `LogicalPartition` the survey sampled — in the
 single-entry read, the per-system feed and the fleet-wide feed — carries an
 `AssociatedManagedSystem` element whose `href` is the bare
 `.../rest/api/uom/ManagedSystem/<uuid>` of the partition's parent system. No
-partition omitted it, whatever its state.
+sampled partition omitted it, whatever its state (the sampled states are below).
 
 ## What was read
 
@@ -51,8 +51,9 @@ reference lists it for the partition on both generations
 
 ## Not covered
 
-A migrating partition was not sampled (the lab has no second system to migrate to),
-so whether the element survives a migration in flight is unobserved. Every sampled
+A migrating partition was not sampled (the capture was read-only, so none was
+induced, and none happened to be in flight), so whether the element survives a
+migration is unobserved. Every sampled
 partition reported `MigrationState` `Not_Migrating`.
 
 ## Evidence in the repository
@@ -60,7 +61,9 @@ partition reported `MigrationState` `Not_Migrating`.
 - `tests/fixtures/live/rest-lpar-feed-per-system.json` — a tokenized per-system
   feed of one `running` and one `not activated` partition (capture
   `2026-10-12-q466`). Its partitions are renamed `sys-R13-lp1` and `sys-R13-lp2`:
-  the exporter keeps a name's suffix, and these suffixes were not synthetic.
+  the exporter keeps a name's suffix, and these suffixes were not synthetic. The
+  adapters' `MACAddressPrefix` values and the running partition's `Uptime` are
+  zeroed for the same reason.
 - `tests/fixtures/live/rest-lpar-entry.json` and `rest-lpar-entry-lp3.json` — the
   single-entry reads of `not activated` partitions (2026-09-29, 2026-09-30), which
   already carried the element.
