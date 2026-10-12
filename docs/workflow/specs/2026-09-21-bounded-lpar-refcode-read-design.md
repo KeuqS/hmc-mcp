@@ -49,9 +49,16 @@ while the command always passes `-n` so its shape is fixed.
 - **Accepted failure classes** — an HMC naming these three attributes differently raises
   `HMCCLIError` rather than returning wrong rows (fails closed; no live evidence yet). An empty
   read arrives as the exit-0 literal `No results were found.` (`docs/HMC_HINTS.md:170-181`) or as
-  blank stdout, and both return `[]`. An unknown partition is assumed to reach that same empty
-  path and return `[]` rather than a distinct error — unverified here, disclosed in the tool
-  docstring, and confirmed live by #879. `-n` above 100 is refused rather than streamed.
+  blank stdout, and both return `[]`. An unknown partition is **not** that empty path. Observed live (#893,
+  2026-10-12, an HMC at V10R3 SP1060 managing a POWER8 8247-22L; fixture `tests/fixtures/live/cli-refcodes-unknown-lpar.json`,
+  driven by `tests/unit/test_ssh_refcodes.py`): the reader's own command against a partition name
+  the HMC does not know exits 1 and prints `HSCL8012 The partition named <name> was not found.` on
+  stdout with stderr empty, so the reader raises `HMCCLIError` rather than returning `[]`. The same
+  command with an unknown `lpar_ids` value or an unknown `-m` system was also refused with
+  exit 1 (`HSCL8011`, `HSCL8018`), seen only in the private capture, not fixture-backed; the
+  reader selects by name only. A known partition answers exit 0 (`cli-refcodes.json`).
+  Observed on that one HMC release and system family only. `-n` above 100 is refused rather than
+  streamed.
 - **Covered elsewhere** — `lsrefcode -r sys`, `-s p|s`, FRU and LED inventory: #691.
   Multi-partition `lpar_names=p1,p2`: `build_filter` refuses an embedded comma; follow-up if #876
   needs it. Live observation and promotion to `current` maturity: #879. SSH transport, timeout and
