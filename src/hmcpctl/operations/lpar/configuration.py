@@ -5,7 +5,15 @@ from __future__ import annotations
 from hmcpctl.client.core import HMCClient
 from hmcpctl.operations.lpar.ownership import (
     _authorize_system_lpar_profile_restore,
+    _hosts_partition,
+    _resolve_system_name,
+    authorize_lpar_mutation,
     resolve_and_authorize_lpar_names,
+)
+from hmcpctl.resource_identity import (
+    ResourceNotFoundError,
+    is_uuid,
+    resolve_system_uuid,
 )
 
 from ...ssh.profiles import (
@@ -64,14 +72,55 @@ async def configure_lpar_msp(
     *,
     ownership_override: bool = False,
 ) -> str:
-    """Authorize and set an LPAR's migratable-service-partition flag."""
-    system_name, lpar_name = await resolve_and_authorize_lpar_names(
+    """Authorize a VIOS and set its migratable-service-partition flag (ADR 0092 §1)."""
+    system_name, vios_name = await _resolve_and_authorize_vios_names(
         hmc,
         system_name_or_uuid,
         lpar_name_or_uuid,
         ownership_override=ownership_override,
     )
-    return await set_lpar_msp(hmc.config, system_name, lpar_name, enabled)
+    return await set_lpar_msp(hmc.config, system_name, vios_name, enabled)
+
+
+async def _resolve_and_authorize_vios_names(
+    hmc: HMCClient,
+    system_name_or_uuid: str,
+    vios_name_or_uuid: str,
+    *,
+    ownership_override: bool,
+) -> tuple[str, str]:
+    """Resolve a VIOS the selected system hosts, authorize it, and return CLI names.
+
+    ADR 0092 §1: ``msp`` is valid only on a Virtual I/O Server, so its target
+    crosses the same description-stamp rule as an LPAR. The system's own
+    ``VirtualIOServer`` feed establishes containment and supplies the name.
+    """
+    system_uuid = await resolve_system_uuid(hmc, system_name_or_uuid)
+    entries = await hmc.list_vios(system_uuid)
+    if is_uuid(vios_name_or_uuid):
+        matches = [e for e in entries if _hosts_partition([e], vios_name_or_uuid)]
+    else:
+        matches = [
+            e
+            for e in entries
+            if (e.get("Resource") or {}).get("PartitionName") == vios_name_or_uuid
+        ]
+    vios_name = (
+        (matches[0].get("Resource") or {}).get("PartitionName") if matches else None
+    )
+    if not isinstance(vios_name, str) or not vios_name.strip():
+        raise ResourceNotFoundError(
+            "VIOS",
+            vios_name_or_uuid,
+            f"No Virtual I/O Server (lpar_env=vioserver) {vios_name_or_uuid!r} on "
+            f"managed system {system_uuid}. Use hmc_list_vios to list its VIOS "
+            "partitions.",
+        )
+    system_name = await _resolve_system_name(hmc, system_uuid, system_name_or_uuid)
+    await authorize_lpar_mutation(
+        hmc, system_name, vios_name, ownership_override=ownership_override
+    )
+    return system_name, vios_name
 
 
 async def configure_lpar_processor_compatibility(

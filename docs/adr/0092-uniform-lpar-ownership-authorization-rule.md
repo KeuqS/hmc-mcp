@@ -66,6 +66,19 @@ Server. #366 moved that determination's subject out of the tool body into
 `operations/install.py`, where §3.4a classifies the install operation. ADR 0203 later
 retired the LPAR-selector tool and its operation.
 
+**One VIOS-targeting operation is governed (#1318).** `configure_lpar_msp` sets `msp`,
+which the HMC accepts only on a Virtual I/O Server, so its target can never be a
+`LogicalPartition`. It resolves the target through the selected managed system's
+`VirtualIOServer` feed — a name by exact `PartitionName`, a UUID by case-insensitive
+match — which establishes containment as ADR 0094 does for LPARs, and refuses a selector
+outside that feed before any SSH command. The resolved VIOS then crosses §2's rule
+through `authorize_lpar_mutation` unchanged: a foreign or malformed stamp is refused, an
+unstamped description proceeds (ADR 0011 never stamps a VIOS, so this is the common
+case), and the §5 override skips the read and is audited. The tool still declares
+`target_kind="lpar"`, so a #218 access-policy grant names the VIOS under `lpar` targets;
+a `vios` grant does not authorize it. The other VIOS mutations above stay out of scope;
+this paragraph does not extend to them.
+
 Also out of scope: read operations; managed-system-, user- and cluster-scoped
 mutations that name no partition (`create_volume_group`, `create_media_repository`,
 `power_system`, `set_sriov_adapter_mode`, `set_pcm_preferences` — which rejects
@@ -203,7 +216,7 @@ The remaining direct entry points and their guard state are:
 
 | Entry point | Location | Status | Tracking |
 |---|---|---|---|
-| `configure_lpar_msp` | `operations/lpar/configuration.py::configure_lpar_msp` | guarded (`operations/lpar/configuration.py::configure_lpar_msp`) | — |
+| `configure_lpar_msp` | `operations/lpar/configuration.py::configure_lpar_msp` | guarded (`operations/lpar/configuration.py::configure_lpar_msp`, via `operations/lpar/configuration.py::_resolve_and_authorize_vios_names`); targets a VIOS (§1) | #1318 |
 | `configure_lpar_processor_compatibility` | `operations/lpar/configuration.py::configure_lpar_processor_compatibility` | guarded (`operations/lpar/configuration.py::configure_lpar_processor_compatibility`) | — |
 | `hmc_modify_lpar` | `server_tools/lpar/lifecycle.py::hmc_modify_lpar` | guarded by `operations/lpar/dlpar.py::modify_lpar` before any write | — |
 | `hmc lpar modify` (CLI) | `cli_commands/lpar/modify.py::lpars_modify` | guarded by `operations/lpar/dlpar.py::modify_lpar` before any write | — |
