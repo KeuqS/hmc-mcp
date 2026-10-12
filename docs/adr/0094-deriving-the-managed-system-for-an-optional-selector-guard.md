@@ -274,6 +274,11 @@ If a survey later confirms the link across the supported firmware generations,
 replacing the walk with it is a contained change behind
 `_discover_owning_system_uuid` and should be recorded as its own decision.
 
+*Update (#466):* the survey has since been run. Every `LogicalPartition` on V10R3 and
+V11R2 carries the link in all three representations, so the rejection above no longer
+rests on an unobserved element; see `docs/workflow/lpar-parent-system-survey-466.md`.
+The walk stays until a decision replaces it.
+
 **Move the guard's read from SSH to the REST `Description` element.** ADR 0071
 established that the description is readable over REST and fully inlined in the
 per-system list feed, which would make discovery and authorization one call.

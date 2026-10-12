@@ -26,6 +26,13 @@ back and then deleted.
 `cli-memopt-resgroup-calc` (`capture` prefix `2026-10-05-v11r2-p11-9824/`) is a read-only
 capture for #627 on the V11R2 HMC and POWER11 9824-42A system above.
 
+`rest-lpar-feed-per-system` (`capture` prefix `2026-10-12-q466/`) is a read-only capture for
+#466 on the V10R3 HMC: a `ManagedSystem/<uuid>/LogicalPartition` feed of one running and one
+not-activated partition, from a system other than the #1161 one. Its partition names are
+`sys-R13-lp1` and `sys-R13-lp2`, renamed from the exporter's output because the exporter keeps a
+name's suffix and these were not synthetic. Its token map is its own, as for the exports above.
+`docs/workflow/lpar-parent-system-survey-466.md` records what the capture shows.
+
 ## Format
 
 Every file is a JSON object with these keys:
