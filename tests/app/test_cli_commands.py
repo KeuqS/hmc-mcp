@@ -3843,8 +3843,8 @@ def test_lpm_recovery_command_rejects_invalid_timing_before_submission(fake_hmc)
             ("chsyscfg", "name=lpar1", "description=new text"),
         ),
         (
-            ["lpars", "set-msp", "lpar1", "sys1", "true", "--yes"],
-            ("chsyscfg", "name=lpar1", "msp=1"),
+            ["lpars", "set-msp", "vios1", "sys1", "true", "--yes"],
+            ("chsyscfg", "name=vios1", "msp=1"),
         ),
         (
             ["lpars", "set-proc-compat", "lpar1", "sys1", "POWER10", "--yes"],
@@ -3886,7 +3886,7 @@ def test_destructive_ssh_commands_delegate_valid_arguments(
     "args",
     [
         ["lpars", "set-description", "lpar1", "sys1", "new text", "--yes"],
-        ["lpars", "set-msp", "lpar1", "sys1", "true", "--yes"],
+        ["lpars", "set-msp", "vios1", "sys1", "true", "--yes"],
     ],
 )
 def test_destructive_ssh_commands_preserve_bracketed_result(
@@ -3957,6 +3957,45 @@ def test_remove_vnic_cli_names_slot_selector():
     assert result.exit_code == 0
     assert "slot_num" in result.output
     assert "vnic_id" not in result.output
+
+
+def test_lpars_set_msp_refuses_foreign_vios_owner(monkeypatch, fake_hmc):
+    """The CLI crosses the operations-layer ownership guard before chsyscfg (#1318)."""
+    commands: list[str] = []
+
+    async def fake(_config, command):
+        commands.append(command)
+        return "vioserver\n"
+
+    async def foreign(*_args):
+        return "[hmcpctl owner:another-agent created:2026-08-14]"
+
+    _patch_ssh_command(monkeypatch, fake)
+    monkeypatch.setattr(lpar_ownership, "get_lpar_description", foreign)
+
+    result = RUNNER.invoke(
+        cli.app, ["lpars", "set-msp", "vios1", "sys1", "true", "--yes"]
+    )
+
+    assert result.exit_code != 0
+    assert "ownership_override=true" in str(result.exception) + result.output
+    assert not any(command.startswith("chsyscfg") for command in commands)
+
+
+def test_lpars_set_msp_forwards_ownership_override(monkeypatch, fake_hmc):
+    """``--ownership-override`` reaches the operation as ``ownership_override``."""
+    operation = AsyncMock(return_value="")
+    monkeypatch.setattr(cli_lpars, "configure_lpar_msp", operation)
+
+    result = RUNNER.invoke(
+        cli.app,
+        ["lpars", "set-msp", "vios1", "sys1", "false", "--yes", "--ownership-override"],
+    )
+
+    assert result.exit_code == 0, result.output
+    operation.assert_awaited_once()
+    assert operation.call_args.args[1:] == ("sys1", "vios1", False)
+    assert operation.call_args.kwargs == {"ownership_override": True}
 
 
 @pytest.mark.parametrize("command", ["add-vnic", "remove-vnic"])
