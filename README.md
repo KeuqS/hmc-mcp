@@ -38,7 +38,7 @@ Write `hmcpctl[app] @ ...` for the CLI and MCP server. With uv, `uv add --raw
 "hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"` writes that entry. Without
 `--raw`, uv moves the Git source into `[tool.uv.sources]`, which stays out of your package's
 published metadata: other installers then look for `hmcpctl` on PyPI, where this project
-publishes nothing and the name is not ours.
+publishes nothing and has not reserved the name, so whoever registers it decides what installs.
 
 Existing pre-release installations must use the one-time
 [clean-cutover procedure](docs/configuration.md#clean-cutover-from-the-former-name).
