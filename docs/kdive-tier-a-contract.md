@@ -27,7 +27,8 @@ commit, and expect signatures to move in a later release.
 Of these, 0.1.0 claims live verification for power on, delayed and immediate power off,
 partition and state readback, and console capture
 ([what 0.1.0 supports](compatibility.md#what-010-supports)). Cycle, reset and graceful off,
-ownership readback and the force crash (`hmc_dump_restart_lpar`) ship without that claim.
+the RMC fields of the partition readback, ownership readback and the force crash
+(`hmc_dump_restart_lpar`) ship without that claim.
 
 The same operations are MCP tools: `hmc_power_on_lpar`, `hmc_power_off_lpar`,
 `hmc_dump_restart_lpar`, `hmc_get_lpar`, `hmc_get_lpar_state`, `hmc_capture_lpar_console`, and

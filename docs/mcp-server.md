@@ -84,7 +84,8 @@ with `all-targets` can therefore still disclose the `prod` inventory. When the
 configuration or policy is sensitive, withhold these tools by name: enumerate
 the permitted `tools` without granting the `read` effect class.
 
-The next sections describe the logical LPAR workflow tools: tool search and invocation,
+The next two sections, and [Logical operation state](#logical-operation-state) for
+`hmc_operation_status`, describe the logical LPAR workflow tools: tool search and invocation,
 `hmc_inventory`, `hmc_plan_lpar`, `hmc_power_lpar`, `hmc_inspect_lpar` and
 `hmc_operation_status`. They are in the 0.1.0 catalog, but the workflow they belong to is
 planned for 0.2.0 and 0.1.0 makes no live-verification claim for them

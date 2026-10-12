@@ -7,7 +7,9 @@
 hmcpctl 0.1.0 claims live verification for exactly the 15 operations below. Each passed a live
 run on HMC V10R3 M1060 managing a POWER9 system, and the code that run exercised is unchanged at
 the release commit, so the verification ledger reads `current` for it there. Another HMC level
-or machine model may answer differently. They cover the
+or machine model may answer differently. The live run called the MCP tools in the table, so
+the claim is about those tools and the operations beneath them; the `hmcpctl` CLI commands
+that wrap the same operations were not exercised by it. The operations cover the
 [kdive Tier A contract](kdive-tier-a-contract.md)'s power-on, power-off, state and console
 operations, and the create, slot, power, observation and delete steps of the
 [bare-CEC LPAR recipe](recipes/bare-cec-lpar.md); the recipe's `lpars get-description`
