@@ -10,6 +10,9 @@ Accepted (2026-09-22)
 >
 > **Amended** (2026-10-04, issue #1314): `operation="shutdown"` with `restart=True` and
 > `immediate=False` is refused. See *Amendment: the implicit dump restart* below.
+>
+> **Note** (2026-10-12, issue #1459): VIOS PowerOff stays `immediate`-only. See
+> *Note: VIOS PowerOff stays `immediate`-only* below.
 
 ## Context
 
@@ -128,6 +131,19 @@ re-exported builder narrows: a caller relying on the defaults with `restart=true
 refusal. kdive's `cycle` and `reset` (`immediate=true`) and `hmc_power_lpar` (ADR 0199) never
 form the combination. `lpar.power_off` stays `stale (closure-changed)`; nothing here promotes
 it.
+
+## Note: VIOS PowerOff stays `immediate`-only
+
+The VIOS PowerOff job documents the same three request parameters as the LPAR job
+(`docs/refs/hmc-rest-api-p11/jobs/virtualioserver-jobs/151-poweroff_virtualioserver-job.md:28-30`),
+but `power_off_vios_job` (`jobs/requests.py`) and `hmc_power_off_vios` expose only `immediate`.
+That is deliberate, not an omission: this record's reason for widening the LPAR builder was a
+named consumer need (kdive's `cycle`, `reset`, graceful and force-crash actions on a partition),
+and no consumer has asked for a restarting or dumping VIOS power-off. Judgment: a VIOS also carries client
+partitions' storage and network, so a dump restart there is a larger blast radius than the LPAR
+case this record gates, with no opt-in designed for it. Widening the tool needs a consumer request
+and its own decision on the vocabulary and the control shape for a dump restart (a separate tool and grant, as ADR 0188 gave the LPAR case); no live VIOS
+PowerOff has been captured either, so behaviour of the extra parameters on a VIOS is unverified.
 
 ## Considered & rejected
 
