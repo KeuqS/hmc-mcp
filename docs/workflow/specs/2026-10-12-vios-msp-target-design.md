@@ -74,8 +74,8 @@ No obsolete path remains; the LPAR helper keeps its other callers.
 - Boundaries: caller-supplied `system_name_or_uuid` and `vios_name_or_uuid` (existing,
   now resolved through a second feed); the VIOS description read (existing SSH path).
   Nothing new is added; the CLI path is narrowed by gaining the guard. The tool keeps
-  `target_kind="lpar"` (re-kinding is excluded), so a #218 policy grant names a VIOS under
-  `lpar` targets; the kind mismatch is reported as a follow-up, not changed here.
+  `target_kind="lpar"` (unchanged; not in this charter's surface), so a #218 policy grant
+  names a VIOS under `lpar` targets; the kind mismatch is a reported follow-up candidate.
 - Actor: an authorized caller, or an agent sharing the HMC, naming a VIOS it does not own,
   or pairing a UUID with the wrong system.
 - Controls: feed containment (decision 2); stamp rule (decision 1); `shlex`-quoted SSH
