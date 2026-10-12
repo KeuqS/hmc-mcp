@@ -52,8 +52,8 @@ outside `^[A-Za-z0-9_.]{1,79}$` before any request, and that pattern is an **unc
 assumption**: it entered `src/` in commit 61ee6960 with no cited capture or reference, a
 search of the vendored reference (the web File document has no page there; `AddOpticalMedia`
 lists `FileName` with no pattern) and of the committed captures finds no source, and
-`GET /rest/api/web/File` answered 204 everywhere. No name outside the pattern has been
-sent to an HMC, so the rule may be stricter than the HMC's.
+`GET /rest/api/web/File` answered 204 everywhere. No name outside the pattern is known to
+have been sent to an HMC, so the rule may be stricter than the HMC's.
 The refusal message says so. Reconsider it when an operator-authorized window tests an
 edge-case name (a hyphen, or a name of 80 or more characters) or a reference states the
 grammar.

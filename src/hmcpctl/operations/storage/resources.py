@@ -955,7 +955,7 @@ async def upload_iso(
 
     # An uncaptured assumption (ADR 0177): no capture or reference states the HMC's
     # Filename grammar. The pattern is a conservative client-side allowlist, and no
-    # name outside it has been sent to an HMC, so the HMC may accept more.
+    # name outside it is known to have been sent to an HMC, so the HMC may accept more.
     _HMC_FILENAME_RE = re.compile(r"^[A-Za-z0-9_.]{1,79}$")
     if not _HMC_FILENAME_RE.match(media_name):
         raise ValueError(
