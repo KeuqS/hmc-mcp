@@ -21,8 +21,12 @@ kdive imports the LPAR domain modules under `hmcpctl.operations.lpar`:
 
 These are **pre-release** domain operations: importable, but not compatibility promises.
 Only the six names in `hmcpctl.api` are stable, and ADR 0118 keeps these operations out of
-that facade; see [Python library](python-api.md#domain-operations). Pin a commit, and expect
-signatures to move before a release promises them.
+that facade; see [Python library](python-api.md#domain-operations). Pin a release tag or a
+commit, and expect signatures to move in a later release.
+
+Of these, 0.1.0 claims live verification for power on and off, partition and state readback,
+and console capture ([what 0.1.0 supports](compatibility.md#what-010-supports)). Ownership
+readback and the force crash (`hmc_dump_restart_lpar`) ship without that claim.
 
 The same operations are MCP tools: `hmc_power_on_lpar`, `hmc_power_off_lpar`,
 `hmc_dump_restart_lpar`, `hmc_get_lpar`, `hmc_get_lpar_state`, `hmc_capture_lpar_console`, and

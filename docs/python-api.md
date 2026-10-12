@@ -2,8 +2,9 @@
 
 [Documentation index](index.md)
 
-Install the library from a local checkout into your application's virtual
-environment:
+A project that depends on the library pins a release tag, in the form the
+[README](../README.md#install) shows. To install from a local checkout into your
+application's virtual environment instead:
 
 ```bash
 uv pip install /path/to/hmcpctl
