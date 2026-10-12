@@ -74,8 +74,10 @@ match — which establishes containment as ADR 0094 does for LPARs, and refuses 
 outside that feed before any SSH command. The resolved VIOS then crosses §2's rule
 through `authorize_lpar_mutation` unchanged: a foreign or malformed stamp is refused, an
 unstamped description proceeds (ADR 0011 never stamps a VIOS, so this is the common
-case), and the §5 override skips the read and is audited. The other VIOS mutations above
-stay out of scope; this paragraph does not extend to them.
+case), and the §5 override skips the read and is audited. The tool still declares
+`target_kind="lpar"`, so a #218 access-policy grant names the VIOS under `lpar` targets;
+a `vios` grant does not authorize it. The other VIOS mutations above stay out of scope;
+this paragraph does not extend to them.
 
 Also out of scope: read operations; managed-system-, user- and cluster-scoped
 mutations that name no partition (`create_volume_group`, `create_media_repository`,
