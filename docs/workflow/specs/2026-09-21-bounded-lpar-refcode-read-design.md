@@ -54,8 +54,9 @@ while the command always passes `-n` so its shape is fixed.
   driven by `tests/unit/test_ssh_refcodes.py`): the reader's own command against a partition name
   the HMC does not know exits 1 and prints `HSCL8012 The partition named <name> was not found.` on
   stdout with stderr empty, so the reader raises `HMCCLIError` rather than returning `[]`. The same
-  command with `--filter lpar_ids=<unknown id>` answers `HSCL8011` and with an unknown `-m` system
-  answers `HSCL8018`, both exit 1; the reader selects by name only. A known partition answers exit 0.
+  command with an unknown `lpar_ids` value or an unknown `-m` system was also refused with
+  exit 1 (`HSCL8011`, `HSCL8018`), seen only in the private capture, not fixture-backed; the
+  reader selects by name only. A known partition answers exit 0 (`cli-refcodes.json`).
   Observed on that one HMC release and system family only. `-n` above 100 is refused rather than
   streamed.
 - **Covered elsewhere** — `lsrefcode -r sys`, `-s p|s`, FRU and LED inventory: #691.
