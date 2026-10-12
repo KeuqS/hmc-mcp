@@ -1,5 +1,7 @@
 """Tests for Cluster/SSP job builders, PCM helpers, and metrics tools."""
 
+from urllib.parse import urlsplit
+
 import httpx
 import pytest
 from conftest import live_fixture, live_response, make_config
@@ -292,6 +294,27 @@ def test_metric_links():
     assert links[1]["updated"] == "2026-08-07T12:00:30Z"
 
 
+def test_metric_links_parse_the_captured_system_feed():
+    """A V10R3 system feed: one JSON document, then the partition's sub-feed (#1242).
+
+    The sub-feed entry is `application/atom+xml` and stamped newer than the
+    document; `newest_metric_link` must still select the document.
+    """
+    links = metric_links(live_fixture("rest-pcm-processed-metrics-feed")["body"])
+
+    document = (
+        "/rest/api/pcm/ProcessedMetrics/ManagedSystem_00000003-abcd-4ef0-8abc-"
+        "000000000003_20261012T164746+0000_20261012T184700+0000_30.json"
+    )
+    sub_feed = (
+        "/rest/api/pcm/ManagedSystem/00000003-abcd-4ef0-8abc-000000000003"
+        "/LogicalPartition/00000004-ABCD-4EF0-8ABC-000000000004/ProcessedMetrics"
+    )
+    assert [urlsplit(link["link"]).path for link in links] == [document, sub_feed]
+    assert links[1]["updated"] > links[0]["updated"]
+    assert newest_metric_link(links) == links[0]
+
+
 def test_metric_links_malformed_raises():
     """Malformed XML propagates ParseError instead of silently returning []."""
     with pytest.raises(ET.ParseError):
@@ -425,6 +448,24 @@ def test_processed_metrics_mode_fetch_fetches_latest(monkeypatch, mock_hmc):
     # V10R3 answers `application/json` with 406 and serves the document, typed
     # `application/vnd.ibm.powervm.pcm.json`, for `*/*` (#634).
     assert document.calls[0].request.headers["accept"] == "*/*"
+
+
+def test_processed_metrics_fetches_the_captured_feed_document(monkeypatch, mock_hmc):
+    """The newest JSON document is fetched, not the newer partition subfeed (#1242)."""
+    _hmc_env(monkeypatch)
+    path, feed = live_response("rest-pcm-processed-metrics-feed")
+    mock_hmc.get(path.split("?")[0]).mock(return_value=feed)
+    document = mock_hmc.get(
+        "/rest/api/pcm/ProcessedMetrics/ManagedSystem_00000003-abcd-4ef0-8abc-"
+        "000000000003_20261012T164746+0000_20261012T184700+0000_30.json"
+    ).mock(return_value=httpx.Response(200, json=METRICS_JSON))
+
+    result = hmc_processed_metrics(
+        "ManagedSystem", "00000003-abcd-4ef0-8abc-000000000003", "2026-10-12T16:47:46Z"
+    )
+
+    assert result == METRICS_JSON
+    assert document.call_count == 1
 
 
 def test_processed_metrics_default_mode_is_fetch(monkeypatch, mock_hmc):
