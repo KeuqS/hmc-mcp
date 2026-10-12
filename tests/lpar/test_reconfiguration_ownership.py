@@ -38,6 +38,7 @@ from hmcpctl.operations.virtualization.adapters import (
     add_vscsi_adapter,
     delete_adapter,
 )
+from hmcpctl.resource_identity import ResourceNotFoundError
 from hmcpctl.server_tools.lpar import configuration as server_configuration
 from hmcpctl.server_tools.lpar import lifecycle as server_lifecycle
 from hmcpctl.server_tools.lpar import profiles as server_profiles
@@ -48,6 +49,7 @@ VG = "33333333-3333-4333-8333-333333333333"
 SYSTEM_NAME = "frame1"
 SYSTEM_UUID = "44444444-4444-4444-8444-444444444444"
 LPAR_NAME = "client1"
+VIOS_NAME = "vios-1"
 FOREIGN_OWNER = "[hmcpctl owner:another-agent created:2026-08-14]"
 
 Operation = Callable[[AsyncMock], Awaitable[object]]
@@ -325,7 +327,6 @@ def test_resource_modify_override_skips_ownership_read_and_writes() -> None:
 @pytest.mark.parametrize(
     ("operation", "write_name", "args"),
     [
-        (configure_lpar_msp, "set_lpar_msp", (True,)),
         (configure_lpar_processor_compatibility, "set_lpar_proc_compat", ("POWER9",)),
         (synchronize_lpar_profile, "sync_lpar_profile", ()),
     ],
@@ -354,7 +355,6 @@ async def test_config_operations_reject_foreign_owner_before_ssh_write(
 @pytest.mark.parametrize(
     ("operation", "write_name", "args"),
     [
-        (configure_lpar_msp, "set_lpar_msp", (True,)),
         (configure_lpar_processor_compatibility, "set_lpar_proc_compat", ("POWER9",)),
         (synchronize_lpar_profile, "sync_lpar_profile", ()),
     ],
@@ -377,6 +377,99 @@ async def test_config_operations_override_skips_ownership_read(
 
     read.assert_not_awaited()
     write.assert_awaited_once()
+
+
+def _vios_guard_hmc() -> AsyncMock:
+    """The real-guard double whose selected system hosts one VIOS (#1318)."""
+    hmc = _real_guard_hmc()
+    hmc.list_vios.return_value = [
+        {"UUID": VIOS, "Resource": {"PartitionName": VIOS_NAME}}
+    ]
+    return hmc
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selector", [VIOS, VIOS_NAME])
+async def test_configure_lpar_msp_rejects_foreign_vios_owner_before_write(
+    selector: str,
+) -> None:
+    """A VIOS carrying another agent's stamp is refused before the MSP write."""
+    hmc = _vios_guard_hmc()
+    read = AsyncMock(return_value=FOREIGN_OWNER)
+    write = AsyncMock(return_value="ok")
+
+    with (
+        patch("hmcpctl.operations.lpar.ownership.get_lpar_description", new=read),
+        patch("hmcpctl.operations.lpar.configuration.set_lpar_msp", new=write),
+        pytest.raises(PermissionError, match="ownership_override=true"),
+    ):
+        await configure_lpar_msp(hmc, SYSTEM_UUID, selector, True)
+
+    read.assert_awaited_once_with(hmc.config, SYSTEM_NAME, VIOS_NAME)
+    write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_configure_lpar_msp_writes_unstamped_vios() -> None:
+    """An unstamped VIOS is unowned under ADR 0011 and reaches the write."""
+    hmc = _vios_guard_hmc()
+    write = AsyncMock(return_value="ok")
+
+    with (
+        patch(
+            "hmcpctl.operations.lpar.ownership.get_lpar_description",
+            new=AsyncMock(return_value="\n"),
+        ),
+        patch("hmcpctl.operations.lpar.configuration.set_lpar_msp", new=write),
+    ):
+        await configure_lpar_msp(hmc, SYSTEM_UUID, VIOS_NAME, False)
+
+    write.assert_awaited_once_with(hmc.config, SYSTEM_NAME, VIOS_NAME, False)
+
+
+@pytest.mark.asyncio
+async def test_configure_lpar_msp_override_skips_read_and_audits() -> None:
+    """An approved override reads no stamp, audits the VIOS, and writes."""
+    hmc = _vios_guard_hmc()
+    read = AsyncMock(return_value=FOREIGN_OWNER)
+    write = AsyncMock(return_value="ok")
+
+    with (
+        patch("hmcpctl.operations.lpar.ownership.get_lpar_description", new=read),
+        patch("hmcpctl.operations.lpar.configuration.set_lpar_msp", new=write),
+        patch(
+            "hmcpctl.operations.lpar.ownership.audit.record_ownership_override"
+        ) as audited,
+    ):
+        await configure_lpar_msp(hmc, SYSTEM_UUID, VIOS, True, ownership_override=True)
+
+    read.assert_not_awaited()
+    write.assert_awaited_once()
+    assert audited.call_args.kwargs["lpar"] == VIOS_NAME
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", [False, True])
+async def test_configure_lpar_msp_refuses_non_vios_before_any_ssh(
+    override: bool,
+) -> None:
+    """A selector outside the system's VIOS feed is refused, override or not."""
+    hmc = _vios_guard_hmc()
+    read = AsyncMock(return_value="")
+    write = AsyncMock(return_value="ok")
+
+    with (
+        patch("hmcpctl.operations.lpar.ownership.get_lpar_description", new=read),
+        patch("hmcpctl.operations.lpar.configuration.set_lpar_msp", new=write),
+        pytest.raises(ResourceNotFoundError, match="lpar_env=vioserver"),
+    ):
+        await configure_lpar_msp(
+            hmc, SYSTEM_UUID, LPAR, True, ownership_override=override
+        )
+
+    hmc.list_vios.assert_awaited_once_with(SYSTEM_UUID)
+    read.assert_not_awaited()
+    write.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
