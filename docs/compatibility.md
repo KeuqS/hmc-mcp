@@ -4,12 +4,14 @@
 
 ## What 0.1.0 supports
 
-hmcpctl 0.1.0 claims live verification for exactly the 15 operations below, and for nothing
-else in the catalog. Each passed a live run on HMC V10R3 M1060 managing a POWER9 system, and
-the code that run exercised is unchanged at the release commit, so the verification ledger
-reads `current` for it there. Another HMC level or machine model may answer differently. Together they cover the
-[kdive Tier A contract](kdive-tier-a-contract.md)'s power, state and console reads, and the
-[bare-CEC LPAR recipe](recipes/bare-cec-lpar.md).
+hmcpctl 0.1.0 claims live verification for exactly the 15 operations below. Each passed a live
+run on HMC V10R3 M1060 managing a POWER9 system, and the code that run exercised is unchanged at
+the release commit, so the verification ledger reads `current` for it there. Another HMC level
+or machine model may answer differently. They cover the
+[kdive Tier A contract](kdive-tier-a-contract.md)'s power-on, power-off, state and console
+operations, and the create, slot, power, observation and delete steps of the
+[bare-CEC LPAR recipe](recipes/bare-cec-lpar.md); the recipe's `lpars get-description`
+caller-token check is not in the claim.
 
 | Operation | MCP tool |
 |-----------|----------|
@@ -31,13 +33,16 @@ reads `current` for it there. Another HMC level or machine model may answer diff
 
 "Partial" is the catalog's implementation state: the operation implements some of the vendor
 operation's variants, and the ledger names the ones it does not, such as network boot for
-`lpar.power_on`. The claim covers only the implemented variants.
+`lpar.power_on`. The claim covers what the live run asserted, which the ledger lists for each
+observation. For `lpar.power_off` that is delayed and immediate shutdown; the restart and
+operating-system shutdown forms were not exercised.
 
-Every other tool in the catalog ships in 0.1.0 without a live-verification claim. Some were
-verified at an earlier commit and have since gone stale, and some were never exercised live.
-That includes the logical LPAR workflow tools (`hmc_inventory`, `hmc_plan_lpar`,
-`hmc_power_lpar`, `hmc_inspect_lpar`, `hmc_operation_status`, `hmc_search_tools` and
-`hmc_invoke_tool`), which belong to the work planned for 0.2.0.
+Every other tool in the catalog ships in 0.1.0 without a live-verification claim. Most were
+verified at an earlier commit and have since gone stale, or were never exercised live. That
+includes the logical LPAR workflow tools (`hmc_inventory`, `hmc_plan_lpar`, `hmc_power_lpar`,
+`hmc_inspect_lpar`, `hmc_operation_status`, `hmc_search_tools` and `hmc_invoke_tool`), which
+belong to the work planned for 0.2.0. A few other operations may also read `current` in the
+report; the release does not claim them.
 
 The [verification ledger](capabilities/README.md#derived-staleness) is the authority for each
 operation's state. On a checkout of the release tag, after `just setup`, run:

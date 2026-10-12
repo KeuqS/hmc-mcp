@@ -495,8 +495,7 @@ file that other users can access.
 One process at a time runs logical operations. Another session can read status but refuses
 a mutation, naming the pid of the process that holds the lock. When a process exits mid-operation,
 status keeps showing `running` until a process that can take the lock recovers it. Nothing resumes
-on its own: a logical tool continues an operation only on a call with `continuation: resume`,
-or `continuation: boot` for one paused ready to boot.
+on its own: a logical tool continues an operation only on a call with `continuation: resume`.
 
 Terminal operations are pruned 30 days after they end, and each operation keeps its newest 1,024
 events. The resource ledger is never pruned; decommission will remove its entries (#1229), and

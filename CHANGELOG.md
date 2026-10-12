@@ -14,13 +14,15 @@ First tagged release. It ships the `hmcpctl` CLI, the MCP server, and the Python
 stable Python API is the six-name `hmcpctl.api` facade (ADR 0118); every other module is a
 pre-release domain API. The release claims live verification for 15 operations, listed with
 how to check any other operation's state in
-[`docs/compatibility.md`](docs/compatibility.md#what-010-supports).
+[`docs/compatibility.md`](https://github.com/randomparity/hmc-mcp/blob/v0.1.0/docs/compatibility.md#what-010-supports).
 
 The entries below record the development that preceded the tag. Defect fixes made before the
 tag are not itemized, because no earlier release shipped the defects; each is in the commit
 history under its issue number, and the behavior it settled is described in the guides and the
 generated tool reference. An entry that reports live verification describes a run at an earlier
 commit; the verification ledger, not this changelog, says which observations still apply.
+Entries name modules, facade exports and tools as they stood when written: ADR 0118 later
+reduced the facade to six names, and several modules have since moved or been renamed.
 
 ### Added
 
@@ -734,7 +736,7 @@ commit; the verification ledger, not this changelog, says which observations sti
   Data the former tool wrote keeps its old name and is no longer recognised: a
   `[hmc-mcp owner:…]` stamp reads as unowned, an `hmc-mcp.lpar-snapshot` is refused, and
   `X-Audit-Memento` is now `hmcpctl:<agent_id>`. The
-  [cutover guide](docs/configuration.md#clean-cutover-from-the-former-name) moves the
+  [cutover guide](https://github.com/randomparity/hmc-mcp/blob/v0.1.0/docs/configuration.md#clean-cutover-from-the-former-name) moves the
   configuration and lists what to do about each (ADR 0167, #898).
 
 - `assign_dedicated_pcie_slot`, `unassign_dedicated_pcie_slot` (`hmc_assign_dedicated_pcie_slot`,
@@ -1086,7 +1088,7 @@ commit; the verification ledger, not this changelog, says which observations sti
 (`tests/unit/test_public_api.py`). This is the first manifest a release ships. Earlier drafts
 of this changelog recorded a 127-name `hmc_mcp.api` manifest and its deltas; no release shipped
 them, and the operations they named are now pre-release domain-module APIs
-([Python library](docs/python-api.md)).
+([Python library](https://github.com/randomparity/hmc-mcp/blob/v0.1.0/docs/python-api.md)).
 
 [unreleased]: https://github.com/randomparity/hmc-mcp/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/randomparity/hmc-mcp/releases/tag/v0.1.0
