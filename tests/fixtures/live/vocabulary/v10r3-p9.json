@@ -2,7 +2,8 @@
  "firmware": "v10r3-p9",
  "sources": [
   "2026-09-30 read-only sweep: HMC V10R3 M1060 managing a POWER9 8375-42A",
-  "2026-09-29/30 #1161 and #879 windows, same HMC (derived REST values and endpoints)"
+  "2026-09-29/30 #1161 and #879 windows, same HMC (derived REST values and endpoints)",
+  "2026-10-12 read-only PCM metric-feed capture (#1242): HMC V10R3 M1060 managing a POWER9 8375-42A"
  ],
  "rest": {
   "endpoints": [
@@ -30,9 +31,23 @@
    {
     "method": "GET",
     "path": "/rest/api/pcm/ManagedSystem/{uuid}/AggregatedMetrics?StartTS={value}",
+    "accept": "*/*",
+    "status": 200,
+    "content_type": "application/atom+xml"
+   },
+   {
+    "method": "GET",
+    "path": "/rest/api/pcm/ManagedSystem/{uuid}/AggregatedMetrics?StartTS={value}",
     "accept": "application/vnd.ibm.powervm.uom+xml",
     "status": 403,
     "content_type": "application/atom+xml;charset=ISO-8859-1"
+   },
+   {
+    "method": "GET",
+    "path": "/rest/api/pcm/ManagedSystem/{uuid}/LogicalPartition/{uuid}/AggregatedMetrics?StartTS={value}",
+    "accept": "*/*",
+    "status": 200,
+    "content_type": "application/atom+xml"
    },
    {
     "method": "GET",
@@ -44,9 +59,23 @@
    {
     "method": "GET",
     "path": "/rest/api/pcm/ManagedSystem/{uuid}/LogicalPartition/{uuid}/ProcessedMetrics?StartTS={value}",
+    "accept": "*/*",
+    "status": 200,
+    "content_type": "application/atom+xml"
+   },
+   {
+    "method": "GET",
+    "path": "/rest/api/pcm/ManagedSystem/{uuid}/LogicalPartition/{uuid}/ProcessedMetrics?StartTS={value}",
     "accept": "application/vnd.ibm.powervm.uom+xml",
     "status": 403,
     "content_type": "application/atom+xml;charset=ISO-8859-1"
+   },
+   {
+    "method": "GET",
+    "path": "/rest/api/pcm/ManagedSystem/{uuid}/ProcessedMetrics?StartTS={value}",
+    "accept": "*/*",
+    "status": 200,
+    "content_type": "application/atom+xml"
    },
    {
     "method": "GET",
@@ -75,6 +104,13 @@
     "accept": "application/xml",
     "status": 406,
     "content_type": null
+   },
+   {
+    "method": "GET",
+    "path": "/rest/api/pcm/ProcessedMetrics/{value}",
+    "accept": "*/*",
+    "status": 200,
+    "content_type": "application/vnd.ibm.powervm.pcm.json"
    },
    {
     "method": "GET",
@@ -3440,8 +3476,12 @@
    "published": [
     "<text>"
    ],
+   "subtitle": [
+    "<text>"
+   ],
    "title": [
     "<text>",
+    "AggregatedMetrics",
     "Console Internal Error",
     "HttpErrorResponse",
     "JobResponse",
@@ -3451,6 +3491,7 @@
     "ManagementConsole",
     "NetworkBridge",
     "PartitionTemplateSummary",
+    "ProcessedMetrics",
     "QuickPropertyCollection",
     "ResourceRole",
     "SearchParameterSet",
