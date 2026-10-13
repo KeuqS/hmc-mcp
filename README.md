@@ -38,7 +38,7 @@ Write `hmcpctl[app] @ ...` for the CLI and MCP server. With uv, `uv add --raw
 "hmcpctl @ git+https://github.com/randomparity/hmc-mcp@v0.1.0"` writes that entry. Without
 `--raw`, uv moves the Git source into `[tool.uv.sources]`, which stays out of your package's
 published metadata: other installers then look for `hmcpctl` on PyPI, where this project
-publishes nothing and the name is not ours.
+publishes nothing and has not reserved the name, so whoever registers it decides what installs.
 
 Existing pre-release installations must use the one-time
 [clean-cutover procedure](docs/configuration.md#clean-cutover-from-the-former-name).
@@ -46,6 +46,10 @@ Existing pre-release installations must use the one-time
 You need network access to an HMC and an HMC account with permissions for your
 intended operations. The project targets HMC V8–V11; individual operations have
 [version and firmware limits](https://github.com/randomparity/hmc-mcp/blob/main/docs/compatibility.md).
+Release 0.1.0 claims live verification for 15 system, LPAR, job and dedicated-PCIe
+operations on HMC V10R3; the
+[compatibility page](https://github.com/randomparity/hmc-mcp/blob/main/docs/compatibility.md#what-010-supports)
+lists them and shows how to check any other operation's state.
 
 ## Configure
 

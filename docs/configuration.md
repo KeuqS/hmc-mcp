@@ -5,11 +5,15 @@
 ## Configure
 
 Configuration priority (highest to lowest): **CLI flags > `HMC_*` env vars > TOML profile**.
+An explicit `--host` or `HMC_HOST` skips the TOML profile entirely, `--profile` and
+`HMC_PROFILE` included: the connection is built from flags and environment variables alone
+([precedence](environment-variables.md#precedence)).
 
 ## Clean cutover from the former name
 
-This pre-release changes the distribution, command, Python package, and configuration
-directory from `hmc-mcp`/`hmc_mcp` to `hmcpctl`. There is no compatibility alias or
+Before 0.1.0 the project renamed its distribution, command, Python package, and configuration
+directory from `hmc-mcp`/`hmc_mcp` to `hmcpctl`. An installation from before that rename needs
+this one-time cutover. There is no compatibility alias or
 configuration fallback. Stop every old CLI or MCP server process before moving the directory.
 Each transaction below refuses to merge into an existing destination. The shell snippets run in
 a subshell, so a refusal stops the snippet without closing your terminal.
@@ -89,14 +93,6 @@ if (Get-Command hmc-mcp -ErrorAction SilentlyContinue) { throw 'old command rema
 
 Update every MCP client entry from command `hmc-mcp` to `hmcpctl`, preserving its arguments and
 environment, and only then restart the client or server.
-
-Repository hosting and publication are separate operator actions and have **not** been performed
-by this source change. Before a public release, the operator must:
-
-1. Rename the GitHub repository and verify redirects and documentation links.
-2. Update package project URLs to the final repository slug.
-3. Configure the `hmcpctl` PyPI project and its trusted publisher or release token.
-4. Build clean artifacts, publish them, and verify a fresh `hmcpctl[app]` installation.
 
 ### TOML profile (recommended for multi-HMC setups)
 

@@ -108,6 +108,18 @@ unless the line says another client ended the hold (`ConsoleHoldLostError`): lea
 `hmcpctl lpars decommission` enforces the ADR 0011 ownership token even for
 `--dry-run`; use `--ownership-override` only after explicit operator approval.
 
+### Running as a Python module
+
+`python -m hmcpctl` runs the same program as the `hmcpctl` command, wherever the `app` extra is
+installed, and takes the same arguments. Its usage lines name `python -m hmcpctl` instead of
+`hmcpctl`. One difference matters for security: `-m` puts the current working directory first
+on `sys.path`, so a `hmcpctl/` package or a module such as `typer.py` in the launch directory is
+imported before the installed package, in a process that holds profile passwords and, for
+`serve`, a granted access policy. Nothing inside the package can guard against this. Prefer
+`hmcpctl` for a served process, and when you launch the module from a directory you do not
+control, use `python -P -m hmcpctl` or set `PYTHONSAFEPATH=1`
+([ADR 0128](adr/0128-l5-module-entry-point-launch.md)).
+
 ### End-to-end: give an LPAR a bootable disk
 
 For the complete ISO provisioning and optical-boot lifecycle, see the [LPAR ISO installation recipe](recipes/lpar-iso-install.md).
