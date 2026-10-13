@@ -112,43 +112,181 @@ A release is a version in `pyproject.toml` and a Git tag on the same commit
 to a package index, so the tag is what a consumer pins; the [README](../README.md#install)
 shows the form.
 
+Versions are semver. The tag is `vX.Y.Z`, and the GitHub release is titled
+`hmcpctl X.Y.Z (<short-sha>)`, where `<short-sha>` is the tag commit's
+`git rev-parse --short` ID. The version
+is static in `pyproject.toml`, as ADR 0033 sets out, and stays so for 0.1.0. From 0.2.0 the
+version is planned to be derived from Git with hatch-vcs instead (#1471, an ADR superseding
+0033): a tagged build would be `X.Y.Z`, and an untagged one `X.Y.(Z+1).devN+g<sha>`, marked
+when the tree is dirty. Until #1471 lands, the steps below use the static version. Either way
+the changelog heading stays `## [X.Y.Z] - YYYY-MM-DD`, because a commit cannot name its own
+SHA.
+
+A release runs in the order of the subsections below: scope it, name the candidate and freeze
+`main`, verify the candidate live, read the evidence gate, review the docs and cut the
+changelog, tag it, then reopen `main`. Each subsection says who decides what. The operator is
+the maintainer who owns the release.
+
+### Scope
+
+A release is scoped by a release epic, an issue that names:
+
+- the consumer contract the release serves, and
+- the operations it claims as live-verified, by their `just verification-report` operation
+  names, each with the live-testing arm and scenario that evidences it, taken from the
+  scenario id of its catalog observation. Those arms are the window's arm list.
+
+The claimed set is what the release promises; nothing outside it is promised, whatever its
+verification state. For 0.1.0 the epic is #871: the Tier A kdive adopt contract and the
+Tier B bare-CEC path, 15 claimed operations. Changing the claimed set after the live window
+reopens the window for any operation it adds.
+
+### Freeze
+
+The candidate is the `main` commit whose claimed operations' code the release ships and the
+live window runs on. The operator names it on the release epic before the first arm runs, and
+the freeze starts then; it ends when the tag is pushed.
+
+During the freeze, nothing may merge that changes the import closure of a claimed operation:
+the `.py` modules under `src/hmcpctl/` that
+[ADR 0127](adr/0127-derived-live-verification-staleness.md) fingerprints for it. That test is
+the whole rule. Changes that pass it include:
+
+- documentation, including the docs review and changelog cut below;
+- the release-prep commit of [tag and release](#tag-and-release) step 1, which changes
+  `pyproject.toml`, `uv.lock`, the changelog and the README's pinned tag; and
+- evidence commits that promote observations into the catalog, including the
+  `src/hmcpctl/_operation_maturity.json` projection they regenerate, which is data, not a
+  module.
+
+A merge that does move a claimed operation's closure re-stales that operation. Re-run its
+evidencing arms at the new tip, under the window's authorization or a new one, and re-read
+the gate there; never argue that the delta is harmless. The new tip becomes the candidate.
+
+### Live window
+
+The live window produces the evidence that makes each claimed operation `current`. A live run
+creates, mutates and deletes real partitions, so the operator authorizes every window
+explicitly, with:
+
+- the arm list, naming each arm the window may run;
+- the mutation boundary: the managed system and partitions the arms may change;
+- an explicit grant for any arm that touches a VIOS. A grant that does not name VIOS access
+  does not include it; and
+- the read-only reads that make up the window's independent baseline, below.
+
+The operator records the authorization on the release epic before the first arm runs. Each
+authorized arm then runs on the candidate as [live testing](live-testing.md) describes: the
+preflight, the arm, and the recovery check, in that order, with the recovery check run after
+every arm, including one that looked clean.
+
+The window also takes an independent read-only baseline of the mutation boundary before the
+first arm and after the last, separate from the baselines the arms record for themselves.
+Record the comparison on the release epic. Any difference holds the gate until it is
+recovered under live testing's "Confirm the system is clean" step, or explained on the
+release epic.
+
+Each arm's evidence matrix comes from `scripts/live_test_evidence.py`. The runner never
+writes into the catalog, so its observations are promoted by hand in evidence commits, as the
+[capability catalog](capabilities/README.md) describes under "Recording an observation".
+
+### Evidence gate
+
+Read the gate on the `main` commit that carries the promoted observations: the candidate plus
+the evidence commits the freeze admits. At the candidate itself the window's observations are
+not in the catalog yet. Run `just verification-report` on a clean checkout of that commit. It
+prints each operation's derived live-verification state (ADR 0127).
+
+- **Gating:** every claimed operation must read `current`. A claimed operation that reads
+  anything else holds the tag until its evidencing arms re-run at the candidate and their
+  observations are promoted.
+- **Reported, not gating:** `--fail-on-stale` exits 1 when any operation in the whole catalog
+  is stale, including operations the release does not claim and its window did not cover.
+  Run it and record its result on the release epic, but its exit status does not hold the
+  tag. The changelog entry's Known issues list states the global counts from that read
+  (current, stale, unevidenced and unrecorded, of the catalog's total) and points to
+  `just verification-report` and the [capability catalog](capabilities/README.md) for the
+  per-operation list; the full read stays on the release epic. Before the 0.1.0 window, on
+  2026-10-12, the catalog's 163 operations read 17 current, 90 stale, 39 unevidenced and
+  17 unrecorded.
+
+No check yet reads the claimed set alone, so compare the claimed rows against the report by
+hand. Record the pass on the epic with both commits: the candidate and the commit the gate
+was read on.
+
+An observation goes stale either when its closure changes or when it is older than 90 days
+(ADR 0127). A long freeze can therefore re-stale a claimed operation with no merge at all;
+the remedy is the same, re-running its evidencing arms.
+
+### Docs and changelog
+
+Before the tag, review the user-facing documentation against the candidate, and cut the
+changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main`
+during the freeze. For 0.1.0 that work is #1468.
+
+A release's changelog entry is minimal, and it is also the GitHub release body. It holds:
+
+- a short statement of the release's scope and the consumer contract it serves;
+- the claimed operations, each verified `current` at the gate; and
+- a **Known issues** list that names concrete problems, including the global
+  verification counts from the [evidence gate](#evidence-gate). An entry without one is
+  incomplete.
+
+The itemized history of what changed between releases is not carried into the entry; Git
+history keeps it. Guidance an operator needs that only the changelog states moves into the
+user documentation before the itemized history is dropped. For 0.1.0 the itemized
+pre-release history is dropped from the changelog for that reason.
+
+### Tag and release
+
+The operator authorizes the tag after the gate passes, and authorizes the GitHub release
+separately, after the tag. An agent or automated workflow never creates the tag or the
+release.
+
 1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
-   Move the `[Unreleased]` entries in `CHANGELOG.md` under a dated `## [X.Y.Z] - YYYY-MM-DD`
-   heading (`tests/unit/test_changelog.py` requires the declared version to have one), point
-   the changelog's link references at `vX.Y.Z` (the `[unreleased]` compare base and an
-   `[X.Y.Z]` tag link), and update the README's pinned tag. When `pyproject.toml` already
-   declares `X.Y.Z` and the changelog already has its heading but the version was never
-   tagged, as `0.1.0` was, skip the bump and reconcile that existing section with
-   `[Unreleased]` instead of adding a second heading. Merge that change to `main`.
-2. Choose the candidate: the `main` commit that change merged as. Its CI run must be green,
-   and on a clean checkout of it `just verify` must pass.
-3. Run `just verification-report` on that checkout. It prints each operation's derived
-   live-verification state ([ADR 0127](adr/0127-derived-live-verification-staleness.md)), and
-   `--fail-on-stale` exits 1 when any operation in the catalog is stale, so the report alone
-   does not say which stale rows matter. Before reading it, list on the release issue the
-   operations the release claims as live-verified. Each listed operation must read `current`:
-   re-run the arms that evidence a stale one at the candidate, following
-   [live testing](live-testing.md), and promote their observations. Whether stale operations
-   outside that claim hold the tag is the release owner's decision, recorded on the release
-   issue. Promoting observations merges a new commit, so that commit becomes the candidate:
-   repeat step 2 on it and re-read the report, which stays `current` because the catalog is
-   not in any operation's import closure. Nothing that changes a claimed operation's import
-   closure may merge between this check and the tag.
+   Cut the changelog by writing the version's minimal entry, described under
+   [docs and changelog](#docs-and-changelog), under a dated `## [X.Y.Z] - YYYY-MM-DD` heading
+   in `CHANGELOG.md`, in place of the `[Unreleased]` entries (`tests/unit/test_changelog.py`
+   requires the declared version to have a heading). Point the changelog's link references at
+   `vX.Y.Z` (the `[unreleased]` compare base and an `[X.Y.Z]` tag link), and update the
+   README's pinned tag. When `pyproject.toml` already declares `X.Y.Z` and the changelog
+   already has its heading but the version was never tagged, as `0.1.0` was, skip the bump
+   and replace both that existing section and the `[Unreleased]` entries, itemized
+   pre-release history included, with the minimal entry dated for the release, leaving an
+   empty `[Unreleased]` heading. Git keeps the history; reword the changelog's preamble so it
+   no longer claims to record every change. Merge that change to `main`.
+2. Choose the tag commit: the `main` commit that change merged as, or a later `main` commit
+   the freeze admits. Its CI run must be green, and on a clean checkout of it `just verify`
+   must pass.
+3. Re-read `just verification-report` on that checkout and confirm every claimed operation
+   still reads `current`. If one reads anything else, either a merge moved its closure or its
+   observation passed 90 days; in both cases re-run its evidencing arms, as the
+   [freeze](#freeze) rule says, promote their observations, and repeat from step 2 on the
+   commit that carries them. Record the passing read on the release epic with the tag commit.
+   Its global counts must match the entry's Known issues list; if they do not, correct the
+   entry, merge it, and repeat from step 2 on that commit.
 4. Tag that exact commit and push the tag:
 
    ```bash
-   git tag -a vX.Y.Z -m "hmcpctl X.Y.Z" <candidate-sha>
+   git tag -a vX.Y.Z -m "hmcpctl X.Y.Z" <tag-commit-sha>
    git push origin vX.Y.Z
    ```
 
-   Check that `git rev-parse vX.Y.Z^{commit}` prints the candidate and that
+   Check that `git rev-parse vX.Y.Z^{commit}` prints the tag commit and that
    `git show vX.Y.Z:pyproject.toml` declares `X.Y.Z`.
-5. Create the GitHub release from the pushed tag. Its notes are that version's changelog
-   section when it fits GitHub's 125,000-character release-body limit; otherwise they are a
-   short summary linking to that section of `CHANGELOG.md` at the tag. Check the notes file's
-   length before running:
+5. Create the GitHub release from the pushed tag. Its body is the version's changelog entry:
+   copy the entry, without its `## [X.Y.Z]` heading, into the notes file. The title carries
+   the tag commit's short ID:
 
    ```bash
-   gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z" --notes-file <notes.md>
+   short_sha=$(git rev-parse --short "vX.Y.Z^{commit}")
+   gh release create vX.Y.Z --verify-tag --title "hmcpctl X.Y.Z ($short_sha)" \
+     --notes-file <notes.md>
    ```
+
+### After the release
+
+Pushing the tag ends the freeze, and `main` reopens to every change. Close the release epic
+and open the next one, or adopt an existing epic for it, naming its claimed operations and
+consumer contract as in [scope](#scope). The 0.2.0 epic is #1215.
