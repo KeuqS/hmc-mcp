@@ -84,6 +84,13 @@ with `all-targets` can therefore still disclose the `prod` inventory. When the
 configuration or policy is sensitive, withhold these tools by name: enumerate
 the permitted `tools` without granting the `read` effect class.
 
+The next two sections, and [Logical operation state](#logical-operation-state) for
+`hmc_operation_status`, describe the logical LPAR workflow tools: tool search and invocation,
+`hmc_inventory`, `hmc_plan_lpar`, `hmc_power_lpar`, `hmc_inspect_lpar` and
+`hmc_operation_status`. They are in the 0.1.0 catalog, but the workflow they belong to is
+planned for 0.2.0 and 0.1.0 makes no live-verification claim for them
+([what 0.1.0 supports](compatibility.md#what-010-supports)).
+
 ### Tool search and invocation
 
 `hmc_search_tools` (`read`) and `hmc_invoke_tool` (`destructive`) let a client find and call
@@ -478,18 +485,18 @@ reason codes, and how to route or silence them.
 
 ### Logical operation state
 
-The logical LPAR tools will record their progress in a local SQLite store, `operations.sqlite3`,
+The logical LPAR tools record their progress in a local SQLite store, `operations.sqlite3`,
 beside `store-id` and `execution.lock` in one state directory: `HMCPCTL_STATE_DIR` when set,
-otherwise the platform state directory. No tool in this release starts a logical operation, so
-the store is created only once a later release adds one; operator commands for it are #1286. The
+otherwise the platform state directory. In this release `hmc_power_lpar` is the only tool that
+starts a logical operation, so the store is created by its first call; operator commands for
+the store are #1286. The
 directory is created with mode `0700` and its files with `0600`; hmcpctl refuses a directory or
 file that other users can access.
 
 One process at a time runs logical operations. Another session can read status but refuses
 a mutation, naming the pid of the process that holds the lock. When a process exits mid-operation,
 status keeps showing `running` until a process that can take the lock recovers it. Nothing resumes
-on its own: the logical tools (#1223, #1225, #1226, #1227) will continue an operation only on a
-call with `continuation: resume`, or `continuation: boot` for one paused ready to boot.
+on its own: a logical tool continues an operation only on a call with `continuation: resume`.
 
 Terminal operations are pruned 30 days after they end, and each operation keeps its newest 1,024
 events. The resource ledger is never pruned; decommission will remove its entries (#1229), and

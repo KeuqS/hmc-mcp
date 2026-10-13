@@ -159,7 +159,7 @@ lshwres -r sriov --rsubtype adapter -m <system> \
     -F adapter_id,slot_id,config_state,functional_state,\
 phys_ports,logical_ports,adapter_max_logical_ports,sriov_status --header
 
-# SR-IOV physical ports (query both literal levels; exactly one must return rows)
+# SR-IOV physical ports (query all three levels and merge the rows)
 lshwres -r sriov --rsubtype physport -m <system> --level roce \
     --filter adapter_ids=<id> \
     -F adapter_id,phys_port_id,phys_port_type,phys_port_loc,state,\
@@ -167,6 +167,12 @@ config_logical_ports,phys_port_max_logical_ports,curr_eth_logical_ports,\
 min_eth_capacity_granularity --header
 
 lshwres -r sriov --rsubtype physport -m <system> --level ethc \
+    --filter adapter_ids=<id> \
+    -F adapter_id,phys_port_id,phys_port_type,phys_port_loc,state,\
+config_logical_ports,phys_port_max_logical_ports,curr_eth_logical_ports,\
+min_eth_capacity_granularity --header
+
+lshwres -r sriov --rsubtype physport -m <system> --level eth \
     --filter adapter_ids=<id> \
     -F adapter_id,phys_port_id,phys_port_type,phys_port_loc,state,\
 config_logical_ports,phys_port_max_logical_ports,curr_eth_logical_ports,\
@@ -184,12 +190,14 @@ lshwres -r sriov --rsubtype logport -m <system>
 
 **`--level`** selects the granularity or sub-view: `sys` (system totals),
 `lpar` (per-partition), `slot`, `pool`, `roce` (SR-IOV physical ports),
-`ethc` (SR-IOV physical ports), `eth` (SR-IOV configured Ethernet logical ports).
+`ethc` (SR-IOV physical ports), `eth` (SR-IOV physical ports, and configured Ethernet logical
+ports).
 
-**SR-IOV physical-port selection:** use the paired `roce` and `ethc` reads above
-for a positive decimal adapter ID. Exactly one level must return rows; both empty
-means the adapter type is unavailable, while rows at both levels are ambiguous and
-are rejected. Treat `phys_port_type` as returned HMC data, not a level selector.
+**SR-IOV physical-port selection:** run the `roce`, `ethc` and `eth` reads above for a
+positive decimal adapter ID and merge their rows: a port lists at its own type's level, and one
+V11R2 adapter lists ports at both `eth` and `ethc` (ADR 0183). No rows at any level means
+physical-port inventory is unavailable; one port ID listed at more than one level is rejected.
+Treat `phys_port_type` as returned HMC data, not a level selector.
 For accepted rows, HMC state `1` maps to `up` and `0` maps to `down`; any other
 state is rejected.
 

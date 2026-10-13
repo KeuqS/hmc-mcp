@@ -19,7 +19,6 @@ user = "hscroot"
 password = "..."
 verify_ssl = false
 ssh_verify_host_key = true
-schema_version = "V1_0"
 ```
 
 ## SSH port is always 22

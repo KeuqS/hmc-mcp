@@ -20,7 +20,7 @@ An impossible VolumeGroup free-space reading is returned as null with
 `free_space_diagnostic="free_space_exceeds_capacity"`. `size_mib` names media-repository
 and optical-media quantities, and `lu_size_gib` names Shared Storage Pool logical units.
 Numeric virtual-switch selectors are named
-`virtual_switch_id`. Verified vNIC mutations instead select the backing VIOS,
+`virtual_switch_id`. vNIC mutations instead select the backing VIOS,
 SR-IOV adapter, and physical port; they do not accept a virtual-switch selector.
 
 The NIM install tools distinguish `hmc_timeout_minutes` from the client-side
@@ -57,8 +57,9 @@ mode can affect the wider cluster, both tools are non-exhaustive and require
 tool. An effect-class grant with `all-targets` can reach either tool; a targets
 table cannot authorize either one even when it contains both selector kinds.
 
-The verified vNIC mutation contract is admitted only for POWER9 8375-42A managed by HMC V10R3
-M1060. `hmc_add_vnic` selects one backing with `vios_name`, `vios_lpar_id`, `adapter_id`,
+The vNIC mutation contract is admitted only for POWER9 8375-42A managed by HMC V10R3
+M1060. The admission is a code gate, not a live-verification claim: 0.1.0 records no live
+observation of these operations ([what 0.1.0 supports](compatibility.md#what-010-supports)). `hmc_add_vnic` selects one backing with `vios_name`, `vios_lpar_id`, `adapter_id`,
 `physical_port_id`, and `capacity_percent`, plus the vNIC `port_vlan_id`. The HMC assigns the
 logical-port ID; callers do not supply one. A successful or unchanged result reports the assigned
 ID in `backing_after[].logical_port_id` after correlated HMC readback. `hmc_remove_vnic` accepts
@@ -163,9 +164,20 @@ exact ADR 0053 projection; `availability` remains `null` because an empty owner 
 a slot is assignable. SR-IOV identities are `(system, adapter_id)`, adapter identity plus
 `physical_port_id`, and adapter identity plus `logical_port_id`. Their mode, availability,
 ownership/use, location, capacity, and compatibility category fields are explicit nullable values.
-ADR 0053 admits selectors and percentage capacity semantics but no SR-IOV read projection, so these
-three collections currently return `capability-unavailable` with no items and perform no inventory
-command. Percentage fields use decimal percentages, never bytes, bandwidth, or integer weights.
+Percentage fields use decimal percentages, never bytes, bandwidth, or integer weights.
+
+The SR-IOV collections answer only on the HMC level and managed-system model pairs whose captures
+admit them ([ADR 0183](adr/0183-sriov-read-envelope-from-captures.md)):
+
+| HMC level | Model | Admitted reads |
+|-----------|-------|----------------|
+| V10R3 M1060 | 8375-42A | adapters, physical ports, logical ports |
+| V11R2 SP1120 | 9009-42A | adapters, physical ports, logical ports |
+| V11R2 SP1120 | 9824-42A, 9242-21B | adapters only |
+
+Elsewhere a collection returns `capability-unavailable` with no items, and `unavailable_reason`
+names the admitted pairs or, on an admitted model without that read, says why. It reads the HMC level and the system's model to decide, and runs no
+inventory command.
 
 The CLI equivalents are `hmcpctl network list-dedicated-pcie-slots`, `list-sriov-adapters`,
 `list-sriov-physical-ports`, and `list-sriov-logical-ports`. All accept `--json`; the SR-IOV
