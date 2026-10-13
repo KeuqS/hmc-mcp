@@ -4,9 +4,9 @@ Each release's entry is a minimal summary: its scope, the operations verified li
 its known issues. The itemized changes between releases are in the git history, not in this
 file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The six-name
-`hmcpctl.api` facade is defined by ADR 0118; a release's entry states any change to it.
-Domain-module APIs remain pre-release and are not facade movement.
+The heading and link layout follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The six-name `hmcpctl.api` facade is defined by ADR 0118; domain-module APIs remain
+pre-release and are not facade movement.
 
 ## [Unreleased]
 
