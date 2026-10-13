@@ -1,10 +1,16 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable user-facing changes to this project are recorded in this file. The format is
+based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): changes collect under
+`[Unreleased]` in its usual categories until a release is cut. Each release's entry keeps those
+itemized changes and adds a scope statement, a **Verified** section naming the operations
+verified live for it, and a **Known issues** section. The entry is also the GitHub release body.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The six-name
-`hmcpctl.api` facade is defined by ADR 0118; record changes to it under ordinary release
-categories. Domain-module APIs remain pre-release and are not facade movement.
+0.1.0 is the exception. As the first release it has no itemized changes: nothing shipped before
+it, and its pre-release development history is in the git history, not in this file.
+
+The six-name `hmcpctl.api` facade is defined by ADR 0118; record changes to it under ordinary
+release categories. Domain-module APIs remain pre-release and are not facade movement.
 
 ## [Unreleased]
 

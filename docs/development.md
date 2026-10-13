@@ -224,18 +224,22 @@ Before the tag, review the user-facing documentation against the candidate, and 
 changelog, which is step 1 of [tag and release](#tag-and-release). Both land on `main`
 during the freeze. For 0.1.0 that work is #1468.
 
-A release's changelog entry is minimal, and it is also the GitHub release body. It holds:
+Contributors record each user-facing change under `[Unreleased]` in `CHANGELOG.md`, in the
+usual [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories, ADR 0118 facade
+changes included. A release's changelog entry keeps those itemized categories, and it is also
+the GitHub release body. At the cut it gains:
 
 - a short statement of the release's scope and the consumer contract it serves;
-- the claimed operations, each verified `current` at the gate; and
+- a **Verified** section naming the claimed operations, each verified `current` at the gate;
+  and
 - a **Known issues** list that names concrete problems, including the global
-  verification counts from the [evidence gate](#evidence-gate). An entry without one is
-  incomplete.
+  verification counts from the [evidence gate](#evidence-gate). Every release's entry needs
+  one; an entry without it is incomplete.
 
-The itemized history of what changed between releases is not carried into the entry; Git
-history keeps it. Guidance an operator needs that only the changelog states moves into the
-user documentation before the itemized history is dropped. For 0.1.0 the itemized
-pre-release history is dropped from the changelog for that reason.
+0.1.0 is the one exception: the first release, with nothing shipped before it, so its entry
+carries no itemized changes. Its itemized pre-release history was dropped from the changelog,
+after the guidance an operator needs that only the changelog stated moved into the user
+documentation; Git history keeps it.
 
 ### Tag and release
 
@@ -245,17 +249,19 @@ release.
 
 1. On a branch, set `[project] version` to the new `X.Y.Z` and run `uv lock`; `uv lock --check`
    must then pass, because `uv sync --locked` in `just setup` refuses a lock that disagrees.
-   Cut the changelog by writing the version's minimal entry, described under
-   [docs and changelog](#docs-and-changelog), under a dated `## [X.Y.Z] - YYYY-MM-DD` heading
-   in `CHANGELOG.md`, in place of the `[Unreleased]` entries (`tests/unit/test_changelog.py`
-   requires the declared version to have a heading). Point the changelog's link references at
+   Cut the changelog: move the `[Unreleased]` entries under a dated `## [X.Y.Z] - YYYY-MM-DD`
+   heading in `CHANGELOG.md`, keeping their categories, and add the scope statement,
+   **Verified** and **Known issues** sections described under
+   [docs and changelog](#docs-and-changelog) (`tests/unit/test_changelog.py` requires the
+   declared version to have a heading). Point the changelog's link references at
    `vX.Y.Z` (the `[unreleased]` compare base and an `[X.Y.Z]` tag link), and update the
    README's pinned tag. When `pyproject.toml` already declares `X.Y.Z` and the changelog
    already has its heading but the version was never tagged, as `0.1.0` was, skip the bump
    and replace both that existing section and the `[Unreleased]` entries, itemized
-   pre-release history included, with the minimal entry dated for the release, leaving an
-   empty `[Unreleased]` heading. Git keeps the history; reword the changelog's preamble so it
-   no longer claims to record every change. Merge that change to `main`.
+   pre-release history included, with a one-off minimal entry dated for the release (scope,
+   Verified and Known issues only), leaving an empty `[Unreleased]` heading. Git keeps the
+   history. This applies to 0.1.0 alone; later releases keep their itemized categories.
+   Merge that change to `main`.
 2. Choose the tag commit: the `main` commit that change merged as, or a later `main` commit
    the freeze admits. Its CI run must be green, and on a clean checkout of it `just verify`
    must pass.

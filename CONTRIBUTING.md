@@ -28,11 +28,12 @@ instructions in `AGENTS.md`, including its commit and verification conventions.
 
 ## Changelog
 
-Every user-facing change that ships in a release must be recorded in `CHANGELOG.md`, which
-follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Two rules are
-mandatory and enforced by `tests/unit/test_changelog.py`:
+Every user-facing change that ships in a release must be recorded under `[Unreleased]` in
+`CHANGELOG.md`, which follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+format. When a release is cut, its entry keeps those changes and gains scope, **Verified** and
+**Known issues** sections ([releasing](docs/development.md#releasing)).
 
 - The version declared in `pyproject.toml` must have a matching `## [<version>]` entry, so a
-  release cannot ship without one.
-- `hmcpctl.api` is the six-name stable facade defined by ADR 0118. Record changes to it under
-  ordinary changelog categories; domain-module APIs remain pre-release.
+  release cannot ship without one. `tests/unit/test_changelog.py` enforces this.
+- By convention, not by a test, changes to the six-name `hmcpctl.api` facade (ADR 0118) are
+  recorded under ordinary changelog categories; domain-module APIs remain pre-release.
