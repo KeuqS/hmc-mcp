@@ -252,8 +252,10 @@ release.
    `vX.Y.Z` (the `[unreleased]` compare base and an `[X.Y.Z]` tag link), and update the
    README's pinned tag. When `pyproject.toml` already declares `X.Y.Z` and the changelog
    already has its heading but the version was never tagged, as `0.1.0` was, skip the bump
-   and replace that existing section, itemized pre-release history included, with the
-   minimal entry dated for the release; Git keeps the history. Merge that change to `main`.
+   and replace both that existing section and the `[Unreleased]` entries, itemized
+   pre-release history included, with the minimal entry dated for the release, leaving an
+   empty `[Unreleased]` heading. Git keeps the history; reword the changelog's preamble so it
+   no longer claims to record every change. Merge that change to `main`.
 2. Choose the tag commit: the `main` commit that change merged as, or a later `main` commit
    the freeze admits. Its CI run must be green, and on a clean checkout of it `just verify`
    must pass.
