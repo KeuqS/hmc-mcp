@@ -53,6 +53,18 @@ raw HMC payloads. Every entry is the parsed uom resource:
 `{UUID, title, link, ResourceType, Resource}` where `Resource` is the flattened
 XML (namespace-stripped, HMC bookkeeping attributes removed).
 
+### Running as a Python module
+
+`python -m hmcpctl` runs the same program as the `hmcpctl` command, wherever the `app` extra is
+installed, and takes the same arguments. Its usage lines name `python -m hmcpctl` instead of
+`hmcpctl`. One difference matters for security: `-m` puts the current working directory first
+on `sys.path`, so a `hmcpctl/` package or a module such as `typer.py` in the launch directory is
+imported before the installed package, in a process that holds profile passwords and, for
+`serve`, a granted access policy. Nothing inside the package can guard against this. Prefer
+`hmcpctl` for a served process, and when you launch the module from a directory you do not
+control, use `python -P -m hmcpctl` or set `PYTHONSAFEPATH=1`
+([ADR 0128](adr/0128-l5-module-entry-point-launch.md)).
+
 The memory-affinity planning commands are read-only `lsmemopt` calculations.
 Repeat `--prioritize-name`, `--prioritize-id`, `--exclude-name`, or `--exclude-id`
 to describe a scenario, using names or IDs consistently. Calculated scores are

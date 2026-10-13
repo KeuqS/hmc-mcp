@@ -5,9 +5,9 @@ ADR 0128:120-133 records `-m` as putting the caller's working directory first on
 the launch directory is imported before the installed package -- in a process that
 holds profile passwords and a granted access policy. The same record states that **no
 in-package guard closes this**, and names `-P` / `PYTHONSAFEPATH=1` as the one remedy;
-the `python -m hmcpctl` entry under `### Added` in `CHANGELOG.md` is where operators are
-told to use it. Cited by section rather than by line: a changelog gains entries above
-that one every release, so a line citation goes stale with nothing to notice.
+the "Running as a Python module" section of `docs/cli.md` is where operators are told
+to use it. Cited by section rather than by line, so an edit above it cannot leave the
+citation pointing at the wrong text.
 
 Until this module, that remedy was documented and unverified. `tests/app/
 test_entry_point_equivalence.py` launches both forms with `cwd` at an empty `tmp_path`
@@ -239,14 +239,14 @@ def test_a_bare_module_launch_imports_the_shadowing_package(
 def test_the_documented_remedy_reaches_the_installed_package(
     shadowed_cwd, installed_package, flags, overrides
 ):
-    """Both spellings the `CHANGELOG.md` entry gives operators, from that directory."""
+    """Both spellings `docs/cli.md` gives operators, from that directory."""
     result = _launch(shadowed_cwd, flags=flags, overrides=overrides)
 
     assert result.returncode == 0, (
         f"expected the installed CLI to render help (0), got {result.returncode}; "
         f"{_SHADOW_INIT_STATUS} or {_SHADOW_MAIN_STATUS} means the shadowing package "
-        f"was reached anyway, so the remedy ADR 0128:120-133 and the `python -m "
-        f"hmcpctl` CHANGELOG entry give operators no longer keeps the launch directory "
+        f"was reached anyway, so the remedy ADR 0128:120-133 and docs/cli.md's "
+        f"'Running as a Python module' section give operators no longer keeps the launch directory "
         f"off sys.path. "
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )

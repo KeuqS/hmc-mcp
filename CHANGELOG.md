@@ -43,8 +43,7 @@ tool. `just verification-report` prints every operation's current state, and
 
 - Most of the catalog is not live-verified at this commit. Of 163 operations, 17 read
   `current`, 90 `stale`, 39 `unevidenced` and 17 `unrecorded`. The two `current` operations
-  outside the list above, `boot_order.set` and `boot_order.clear`, are not claimed. The
-  ledger is authoritative for each operation.
+  outside the list above are not claimed. The ledger is authoritative for each operation.
 - The logical LPAR workflow tools (`hmc_inventory`, `hmc_plan_lpar`, `hmc_power_lpar`,
   `hmc_inspect_lpar`, `hmc_operation_status`, `hmc_search_tools`, `hmc_invoke_tool`) ship
   without verification. Their workflow is the 0.2.0 target (#1215).
