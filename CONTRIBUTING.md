@@ -35,5 +35,5 @@ format. When a release is cut, its entry keeps those changes and gains scope, **
 
 - The version declared in `pyproject.toml` must have a matching `## [<version>]` entry, so a
   release cannot ship without one. `tests/unit/test_changelog.py` enforces this.
-- By convention, `hmcpctl.api` is the six-name stable facade defined by ADR 0118. Record
-  changes to it under ordinary changelog categories; domain-module APIs remain pre-release.
+- By convention, not by a test, changes to the six-name `hmcpctl.api` facade (ADR 0118) are
+  recorded under ordinary changelog categories; domain-module APIs remain pre-release.
